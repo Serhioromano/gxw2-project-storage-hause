@@ -33,7 +33,6 @@ EI(TRUE);
     100 — РЕЦИРКУЛЯЦИЯ (основное состояние)
     200 — ПОДГОТОВКА К АСПИРАЦИИ (Y00=1, клапаны, задержка пуска)
     300 — АСПИРАЦИЯ (все 10 вентиляторов, обратный отсчёт)
-    400 — ЗАВЕРШЕНИЕ (закрыть приток/сброс, открыть рециркуляцию, Y00=0)
 
   Структура (по решению ревью): шаг 0 — только сброс, безусловно → 2;
   шаг 2 (ОЖИДАНИЕ) ждёт команду режима: Продувка → 50, Авто → 100,
@@ -70,7 +69,7 @@ g_iModeDisp := g_iModeCoarse;
 MOV(iState >= 200, g_iModeDisp, 3); (* Аспирация *)
 
 (* Если выключили во время аспирации *)
-MOV(g_iModeCoarse = 0 AND iState >= 200. STATE_RESET, iState);
+MOV(g_iModeCoarse = 0 AND iState >= 200, STATE_RESET, iState);
 
 (* ── Фронт входа в состояние (однократные действия) ──────────── *)
 xEntry := MEP(iState <> iPrevState);
@@ -93,7 +92,8 @@ STATE_PURGE := 50;
 STATE_RECIRC := 100;
 STATE_PREPARE := 200;
 STATE_PREHEAT := 210;
-STATE_ASPIRATE := 300;
+STATE_ASPER := 300;
+STATE_FINISH := 400;
 
 (* 0=низкая, 1=средняя, 2=высокая *)
 g_iIntensity := LIMITATION(0, g_iIntensity, 2);
@@ -193,13 +193,20 @@ CASE iState OF
     INCP(M8014, g_iPreheatLeft);
     IF g_iPreheatLeft >= g_iPreheatTime THEN
         g_iPreheatLeft := 0; (* сброс счётчика подогрева *)
-        g_xCmdHeatIn1 := FALSE;
-        g_xCmdHeatIn2 := FALSE;
-        g_xCmdHeatOut1 := FALSE;
-        g_xCmdHeatOut2 := FALSE;
+
+        (* Подогрев выключен *)
+        g_xCmdHeatIn1 := FALSE; g_xCmdHeatIn2 := FALSE;
+        g_xCmdHeatOut1 := FALSE; g_xCmdHeatOut2 := FALSE;
 
         (* Холод остановлен *)
         g_xCmdCoolerStop := TRUE;
+
+        (* Вентиляторы: все 10 включены *)
+        g_xCmdFanH1 := TRUE; g_xCmdFanH2 := TRUE;
+        g_xCmdFanH3 := TRUE; g_xCmdFanH4 := TRUE;
+        g_xCmdFanH5 := TRUE; g_xCmdFanH6 := TRUE;
+        g_xCmdFanR1 := TRUE; g_xCmdFanR2 := TRUE;
+        g_xCmdFanR3 := TRUE; g_xCmdFanR4 := TRUE;
 
         (* Клапаны: приток/сброс открыть, рециркуляцию закрыть *)
         g_xCmdValveIn1 := TRUE; g_xCmdValveIn2 := TRUE;
@@ -209,11 +216,17 @@ CASE iState OF
         iState := STATE_ASPER; (* Аспирация *)
     END_IF;
 
-300: (* АСПИРАЦИЯ *)
+300: (* АСПИРАЦИЯ: все 10 вент., приток/сброс открыты, рециркуляция закрыта *)
+    (* Выход из Авто → сброс *)
+    IF g_iModeCoarse <> 1 THEN
+        iState := STATE_RESET;
+    END_IF;
+
+    (* Обратный отсчёт аспирации *)
     INCP(M8014, g_iAspLeft);
     IF g_iAspLeft >= iAspTarget THEN
-        g_iAspLeft := 0; (* сброс счётчика аспирации *)
-        iState := STATE_RESET; (* Завершение аспирации *)
+        g_iAspLeft := 0; (* сброс счётчика *)
+        iState := STATE_RESET; (* переход к ЗАВЕРШЕНИЮ *)
     END_IF;
 
 ELSE
