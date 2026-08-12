@@ -167,13 +167,14 @@ CASE iState OF
         xAspEntry := FALSE;
         (* Проверка t улицы — только для регулярной аспирации *)
         IF (NOT g_xManualAspActive) AND
-           (AI_fTOutside < g_iToutMin OR AI_fTOutside > g_iToutMax) THEN
+           (AI_fTOutside < FLT10(g_iToutMin) OR
+            AI_fTOutside > FLT10(g_iToutMax)) THEN
             iState := 100;              (* пропуск цикла *)
             xSkip := TRUE;
         ELSE
             xSkip := FALSE;
             iFinishLeft := g_iStartDelay;  (* задержка пуска вентиляторов *)
-            IF AI_fTOutside < g_iTpreheat THEN
+            IF AI_fTOutside < FLT10(g_iTpreheat) THEN
                 iPreheatLeft := g_iPreheatTime;
             ELSE
                 iPreheatLeft := 0;
