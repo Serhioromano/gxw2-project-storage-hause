@@ -60,7 +60,7 @@ The library supports a maximum of **128 alarms**.
 | `AM_ORISON`      | Function Block | Test the state of multiple alarms with logical OR |
 | `AM_RESET`       | Function Block | Reset all alarms                            |
 | `AM_IS_BLOCK`    | Function Block | Test for the presence of blocking alarms    |
-| `AM_HAS_ALARM`   | Function Block | Test for the presence of any registered alarm |
+| `AM_HAS_ALARMS`  | Function Block | Test for the presence of any registered alarm |
 | `AM_BUZZER`      | Function Block | Test for alarms that trigger the buzzer     |
 | `AM_EVENT`       | Function Block | Create an event                             |
 | `AM_EVENT_RESET` | Function Block | Reset all latched events                    |
@@ -78,7 +78,7 @@ This function block configures the properties of every alarm the application int
 | `iNum`      | INPUT  | INT  | Alarm identifier. Range: `0` to `127`.                        |
 | `iSeverity` | INPUT  | INT  | Severity level of the alarm. See §Alarm Properties.           |
 | `iProcess`  | INPUT  | INT  | Process group identifier.                                     |
-| `iDelay`    | INPUT  | INT  | Delay before registration. Unit: `1 = 100 ms`.                |
+| `iDelay`    | INPUT  | INT  | Delay before registration. Unit: `1 = 50 ms`.                 |
 | `xLock`     | INPUT  | Bit  | Indicates whether this alarm should halt (lock) the process.  |
 | `xLatch`    | INPUT  | Bit  | Indicates whether this alarm is of the latching type.         |
 | `xBuzzer`   | INPUT  | Bit  | Indicates whether this alarm should activate the buzzer output. |
@@ -297,7 +297,7 @@ END_IF;
 
 ---
 
-### `AM_HAS_ALARM`
+### `AM_HAS_ALARMS`
 
 Determines whether any alarm is currently registered, optionally filtered by process group or severity.
 
@@ -314,7 +314,7 @@ Declare the instance:
 
 ```iecst
 VAR
-    fbAMHas: AM_HAS_ALARM;
+    fbAMHas: AM_HAS_ALARMS;
 END_VAR
 ```
 
