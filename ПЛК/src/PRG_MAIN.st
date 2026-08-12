@@ -46,7 +46,9 @@ EI(TRUE);
   - приоритет над регулярной; работает из любого режима;
   - по завершении возврат: в Авто — в рециркуляцию, иначе — в IDLE.
 
-  Блокирующая тревога (g_xAnyBlock — реле фаз) останавливает автомат.
+  Блокирующая тревога (g_xAnyBlock — реле фаз) НЕ останавливает автомат:
+  блокируются только напорные вентиляторы (380 В). Разгонные (220 В)
+  реле контроля фаз не затрагивает (ТЗ §7.6, v1.2).
 *)
 
 (* Грубый выбор режима по переключателю *)
@@ -59,11 +61,11 @@ ELSE
 END_IF;
 
 
-(* ── Блокирующая тревога (реле фаз): останов автомата ─────────── *)
-IF g_xAnyBlock THEN
-    iState := 0;
-    g_xManualAspActive := FALSE;
-END_IF;
+(* ── Блокирующая тревога (реле фаз) ─────────────────────────────
+   Реле контроля фаз (X02) защищает трёхфазные двигатели 380 В —
+   напорные вентиляторы. Автомат при РКФ НЕ сбрасывается: разгонные
+   вентиляторы (220 В, 1-фазные) РКФ не затрагивает, а напорные
+   блокируются на уровне команд DO — см. часть «Приводы». *)
 
 (* ── Смена режима не в «Авто» (без активной ручной аспирации) → IDLE *)
 IF g_iModeCoarse <> 1 AND NOT g_xManualAspActive AND iState <> 0 THEN
@@ -306,31 +308,34 @@ g_iStep := iState;
    - в режиме «Рециркуляция» (g_iModeDisp = 1) все вентиляторы следуют
      за охладителем X20 (ТЗ §7.3.1);
    - блокирующая тревога «реле фаз» (g_xAnyBlock) снимает команды
-     вентиляторов («останов всех двигателей», план §5);
+     ТОЛЬКО напорных вентиляторов (380 В); разгонные (220 В, 1-фазн.)
+     РКФ не блокирует (ТЗ §7.6, v1.2);
    - в «Продувке» вентиляторами управляет оператор вручную — команды
      автомата в этом режиме равны FALSE (см. выше, состояние IDLE).
 *)
 
-(* ── Вентиляторы: команда автомата, блокировка при реле фаз ───── *)
+(* ── Вентиляторы: команда автомата; при РКФ блок только напорных ─ *)
 DO_FanH1 := g_xCmdFanH1 AND NOT g_xAnyBlock;
 DO_FanH2 := g_xCmdFanH2 AND NOT g_xAnyBlock;
 DO_FanH3 := g_xCmdFanH3 AND NOT g_xAnyBlock;
 DO_FanH4 := g_xCmdFanH4 AND NOT g_xAnyBlock;
 DO_FanH5 := g_xCmdFanH5 AND NOT g_xAnyBlock;
 DO_FanH6 := g_xCmdFanH6 AND NOT g_xAnyBlock;
-DO_FanR1 := g_xCmdFanR1 AND NOT g_xAnyBlock;
-DO_FanR2 := g_xCmdFanR2 AND NOT g_xAnyBlock;
-DO_FanR3 := g_xCmdFanR3 AND NOT g_xAnyBlock;
-DO_FanR4 := g_xCmdFanR4 AND NOT g_xAnyBlock;
+(* Разгонные 220 В: РКФ (трёхфазная защита) их не блокирует *)
+DO_FanR1 := g_xCmdFanR1;
+DO_FanR2 := g_xCmdFanR2;
+DO_FanR3 := g_xCmdFanR3;
+DO_FanR4 := g_xCmdFanR4;
 
-(* ── Рециркуляция: вентиляторы следуют за охладителем (X20) ───── *)
-IF g_iModeDisp = 1 AND NOT g_xAnyBlock THEN
-    DO_FanH1 := DI_CoolerRun;
-    DO_FanH2 := DI_CoolerRun;
-    DO_FanH3 := DI_CoolerRun;
-    DO_FanH4 := DI_CoolerRun;
-    DO_FanH5 := DI_CoolerRun;
-    DO_FanH6 := DI_CoolerRun;
+(* ── Рециркуляция: вентиляторы следуют за охладителем (X20) ─────
+   Напорные — с блокировкой при РКФ, разгонные — без неё. *)
+IF g_iModeDisp = 1 THEN
+    DO_FanH1 := DI_CoolerRun AND NOT g_xAnyBlock;
+    DO_FanH2 := DI_CoolerRun AND NOT g_xAnyBlock;
+    DO_FanH3 := DI_CoolerRun AND NOT g_xAnyBlock;
+    DO_FanH4 := DI_CoolerRun AND NOT g_xAnyBlock;
+    DO_FanH5 := DI_CoolerRun AND NOT g_xAnyBlock;
+    DO_FanH6 := DI_CoolerRun AND NOT g_xAnyBlock;
     DO_FanR1 := DI_CoolerRun;
     DO_FanR2 := DI_CoolerRun;
     DO_FanR3 := DI_CoolerRun;
