@@ -48,6 +48,13 @@ IF g_iAutoResetDelay = 0 THEN g_iAutoResetDelay := 60; END_IF; (* 60 мин — 
 (* IP-адрес ПЛК — задаётся при пусконаладке с HMI (D520–D523);
    заводские октеты применяются только если октет = 0. *)
 
+(* Настройки Modbus slave (порт 2): заводские значения применяются
+   только если текущее значение = 0; изменения с HMI сохраняются. *)
+IF g_iMbAddr = 0 THEN g_iMbAddr := 1; END_IF;        (* адрес 1 *)
+IF g_iMbParity = 0 THEN g_iMbParity := 0; END_IF;    (* 0 = без чётности (NONE) *)
+IF g_iMbStopBit = 0 THEN g_iMbStopBit := 1; END_IF;  (* 1 стоп-бит *)
+IF g_iMbBaud = 0 THEN g_iMbBaud := 9600; END_IF;     (* 9600 бит/с *)
+
 (* ── AlarmManager V203: конфигурация тревог (28 шт.) ────────
    Нумерация 0–27, задержки в единицах 50 мс (тик TCO_TICKER_50).
    См. план §5. *)

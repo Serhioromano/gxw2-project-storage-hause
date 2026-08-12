@@ -241,4 +241,4 @@ fbLight();
    настроен на RS-485 (аппаратно), адрес/скорость — выше.
 *)
 PortSettings := MB_PORT_SETTINGS(MB_PARITY_NONE, MB_STOPBIT_1, MB_BPS_9600);
-xMbDummy := MB_SLAVE_INIT_PORT2(M8002 OR g_xAlarmResetHmi, 1, PortSettings);
+xMbDummy := MB_SLAVE_INIT_PORT2(M8002 OR g_xMbApply, g_iMbAddr, PortSettings);
