@@ -29,7 +29,7 @@ EI(TRUE);
    ЧАСТЬ 1. СЛОЙ АНАЛОГОВЫХ ВХОДОВ (код бывшего FB_IO)
    ════════════════════════════════════════════════════════════════
    - host AI0:  температура улицы, датчик 0-10 В (D8030), диапазон
-                −50…+50 °C → °C×10, обрыв — по ErrWire (g_xErrTout);
+                −50…+50 °C → °C×10, обрыв — по ErrWire (тревога 23);
    - host AI2:  температура в камере, ПВТ110 4-20 мА (D8032),
                 диапазон −40…+80 °C → °C×10;
    - host AI3:  влажность в камере, ПВТ110 4-20 мА (D8033),
@@ -49,10 +49,10 @@ EI(TRUE);
    - g_iCorrTprod1..4 — щупы продукта 1–4.
    Значение Correction прибавляется к результату (см. Utils V3).
 
-   Контроль обрыва 4-20 мА выполняется в части «Тревоги» по СЫРЫМ
-   значениям host-входов (метки AI_iRawTChamber/AI_iRawHChamber, т.е.
-   D8032/D8033, значение ≥ 32720). Масштабированные значения пишутся
-   в метки AI_f* (REAL, D0–D15), которые читают остальные блоки и HMI.
+   ОБРЫВЫ host-датчиков определяются по ErrWire SCALE_AI и регистрируются
+   (fbAMSet 23–25) СРАЗУ после каждого вызова масштабирования ниже.
+   Масштабированные значения пишутся в метки AI_f* (REAL, D0–D15),
+   которые читают остальные блоки и HMI.
 
    Именование: AI_f* — REAL (float), AI_i* — INT (сырые значения).
 
@@ -66,17 +66,17 @@ EI(TRUE);
    Значение SCALE_AI (INT, ×10) через FLT10 → глобальная REAL (для HMI). *)
 fbScaleHost(AINum := 0, SType := STYPE_0_10V, Min := -500, Max := 500,
             Correction := g_iCorrTout, FilterTime := 10, FilterNum := 100);
-g_xErrTout := fbScaleHost.ErrWire;
+fbAMSet(iNum := 23, xState := fbScaleHost.ErrWire);  (* обрыв 0-10 В *)
 AI_fTOutside := FLT10(fbScaleHost.ValueOut);
 
 (* Host AI2: температура в камере (ПВТ110, 4-20 мА, −40…+80 °C) *)
-fbScaleHost(AINum := 2, SType := STYPE_4_20MA, Min := -400, Max := 800,
-            Correction := 0, FilterTime := 10, FilterNum := 100);
+fbScaleHost(AINum := 2, SType := STYPE_4_20MA, Min := -400, Max := 800);
+fbAMSet(iNum := 24, xState := fbScaleHost.ErrWire);  (* обрыв 4-20 мА, t камеры *)
 AI_fTChamber := FLT10(fbScaleHost.ValueOut);
 
 (* Host AI3: влажность в камере (ПВТ110, 4-20 мА, 5…95 %) *)
-fbScaleHost(AINum := 3, SType := STYPE_4_20MA, Min := 50, Max := 950,
-            Correction := 0, FilterTime := 10, FilterNum := 100);
+fbScaleHost(AINum := 3, SType := STYPE_4_20MA, Min := 50, Max := 950);
+fbAMSet(iNum := 25, xState := fbScaleHost.ErrWire);  (* обрыв 4-20 мА, влажность *)
 AI_fHChamber := FLT10(fbScaleHost.ValueOut);
 
 (* L02-RTD: щупы температуры продукта 1–4 (готовые °C×10,
@@ -107,11 +107,10 @@ AI_fTProdAvg := (AI_fTProd1 + AI_fTProd2 + AI_fTProd3 + AI_fTProd4) / 4.0;
    - концевики клапанов — контакт НЗ: «открыт» = вход 0, «не открыт» = вход 1;
    - РД-ДД200 — контакт НЗ: «поток есть» = вход 0, «нет потока» = вход 1.
 
-   Обрыв 4-20 мА ПВТ110 определяется по СЫРЫМ значениям host-входов
-   (метки AI_iRawTChamber/AI_iRawHChamber, т.е. D8032/D8033, значение ≥ 32720).
-   Масштабированные значения — в AI_fTChamber/AI_fHChamber (D2–D5).
-   Обрыв датчика улицы (0-10 В) — по ErrWire из части 1 (g_xErrTout, M552).
-   Порог относится ТОЛЬКО к host-входам (см. план §4, п.5).
+   Обрывы host-датчиков (23–25) регистрируются по fbScaleHost.ErrWire
+   СРАЗУ после масштабирования в части 1 и здесь НЕ повторяются.
+   Обрыв щупов Pt100 (19–22) — по значению ≤ −1900 (модуль L02-RTD
+   контроля обрыва не имеет, см. план §4, п.5).
 *)
 
 (* ── Регистрация условий тревог ───────────────────────────────── *)
@@ -147,13 +146,6 @@ fbAMSet(iNum := 19, xState := AI_fTProd1 <= -1900);
 fbAMSet(iNum := 20, xState := AI_fTProd2 <= -1900);
 fbAMSet(iNum := 21, xState := AI_fTProd3 <= -1900);
 fbAMSet(iNum := 22, xState := AI_fTProd4 <= -1900);
-
-(* 23: обрыв датчика улицы (0-10 В) — ErrWire из части 1 *)
-fbAMSet(iNum := 23, xState := g_xErrTout);
-
-(* 24–25: обрыв 4-20 мА ПВТ110 (host: t° камеры, влажность, ≥ 32720) *)
-fbAMSet(iNum := 24, xState := AI_iRawTChamber >= 32720);
-fbAMSet(iNum := 25, xState := AI_iRawHChamber >= 32720);
 
 (* 26: температура продукта выше максимума (любой из 4 щупов) *)
 fbAMSet(iNum := 26, xState := (AI_fTProd1 > g_iTprodMax) OR
