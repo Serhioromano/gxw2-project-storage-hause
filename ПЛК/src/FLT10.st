@@ -17,7 +17,7 @@
   g_iTpreheat, g_iTprodMax, g_iHmin) и пороги обрывов в логике.
 
   Входы: VAR_INPUT x (INT) — см. FLT10.csv.
-  Вызов: AI_TOutside := FLT10(fbScaleHost.ValueOut);  — без объявления экземпляра (FUN).
+  Вызов: AI_fTOutside := FLT10(fbScaleHost.ValueOut);  — без объявления экземпляра (FUN).
 *)
 
 FLT10 := INT_TO_REAL(x) / 10.0;

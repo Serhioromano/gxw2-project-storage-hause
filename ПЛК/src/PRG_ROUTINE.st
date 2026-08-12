@@ -6,7 +6,7 @@
   Содержит «рутины» — вспомогательные слои, не являющиеся бизнес-логикой:
     1) слой аналоговых входов (код бывшего FB_IO): масштабирование
        7 каналов, коррекции, обрывы; выходы блоков масштабирования (INT, ×10)
-       через функцию FLT10 → глобальные REAL-переменные AI_* (для HMI-графиков);
+       через функцию FLT10 → глобальные REAL-переменные AI_f* (для HMI-графиков);
     2) тревоги AlarmManager V203 (код бывшего FB_ALARMS): AM_SET ×28,
        сводные флаги, упаковка для HMI, сброс/автосброс;
     3) световая колонна: вызов ФБ FB_LIGHT (единственный оставшийся ФБ).
@@ -40,9 +40,9 @@ EI(TRUE);
    МАСШТАБИРОВАННЫЕ ЗНАЧЕНИЯ: SCALE_AI/L02_SCALE_AI выдают INT в масштабе
    ×10 (например, 245 = 24.5 °C). Для HMI-графиков/трендов TK8100 значения
    переводятся функцией FLT10 в REAL (числовое значение сохраняется, ×10;
-   деление на 10 — на панели) и пишутся в глобальные REAL-метки AI_*
+   деление на 10 — на панели) и пишутся в глобальные REAL-метки AI_f*
    (IO.csv: D0–D15, по 2 слова на REAL). Логика (тревоги, автомат) читает
-   те же AI_* — сравнивает с порогами в масштабе ×10 как и раньше.
+   те же AI_f* — сравнивает с порогами в масштабе ×10 как и раньше.
 
    Коррекция датчиков (настройки HMI, °C×10):
    - g_iCorrTout — датчик улицы;
@@ -50,9 +50,11 @@ EI(TRUE);
    Значение Correction прибавляется к результату (см. Utils V3).
 
    Контроль обрыва 4-20 мА выполняется в части «Тревоги» по СЫРЫМ
-   значениям host-входов (метки AI_RAW_TChamber/AI_RAW_HChamber, т.е.
+   значениям host-входов (метки AI_iRawTChamber/AI_iRawHChamber, т.е.
    D8032/D8033, значение ≥ 32720). Масштабированные значения пишутся
-   в метки AI_* (REAL, D0–D15), которые читают остальные блоки и HMI.
+   в метки AI_f* (REAL, D0–D15), которые читают остальные блоки и HMI.
+
+   Именование: AI_f* — REAL (float), AI_i* — INT (сырые значения).
 
    Один экземпляр SCALE_AI используется для всех host-каналов,
    один экземпляр L02_SCALE_AI — для всех щупов (см. Utils V3).
@@ -65,32 +67,32 @@ EI(TRUE);
 fbScaleHost(AINum := 0, SType := STYPE_0_10V, Min := -500, Max := 500,
             Correction := g_iCorrTout, FilterTime := 10, FilterNum := 100);
 g_xErrTout := fbScaleHost.ErrWire;
-AI_TOutside := FLT10(fbScaleHost.ValueOut);
+AI_fTOutside := FLT10(fbScaleHost.ValueOut);
 
 (* Host AI2: температура в камере (ПВТ110, 4-20 мА, −40…+80 °C) *)
 fbScaleHost(AINum := 2, SType := STYPE_4_20MA, Min := -400, Max := 800,
             Correction := 0, FilterTime := 10, FilterNum := 100);
-AI_TChamber := FLT10(fbScaleHost.ValueOut);
+AI_fTChamber := FLT10(fbScaleHost.ValueOut);
 
 (* Host AI3: влажность в камере (ПВТ110, 4-20 мА, 5…95 %) *)
 fbScaleHost(AINum := 3, SType := STYPE_4_20MA, Min := 50, Max := 950,
             Correction := 0, FilterTime := 10, FilterNum := 100);
-AI_HChamber := FLT10(fbScaleHost.ValueOut);
+AI_fHChamber := FLT10(fbScaleHost.ValueOut);
 
 (* L02-RTD: щупы температуры продукта 1–4 (готовые °C×10,
    контроль обрыва модулем не выполняется — детекция по значению).
    Экземпляр fbScaleRtd общий для 4 щупов — ValueOut читаем сразу. *)
 fbScaleRtd(AINum := 0, SType := STYPE_PT100, Correction := g_iCorrTprod1);
-AI_TProd1 := FLT10(fbScaleRtd.ValueOut);
+AI_fTProd1 := FLT10(fbScaleRtd.ValueOut);
 fbScaleRtd(AINum := 1, SType := STYPE_PT100, Correction := g_iCorrTprod2);
-AI_TProd2 := FLT10(fbScaleRtd.ValueOut);
+AI_fTProd2 := FLT10(fbScaleRtd.ValueOut);
 fbScaleRtd(AINum := 2, SType := STYPE_PT100, Correction := g_iCorrTprod3);
-AI_TProd3 := FLT10(fbScaleRtd.ValueOut);
+AI_fTProd3 := FLT10(fbScaleRtd.ValueOut);
 fbScaleRtd(AINum := 3, SType := STYPE_PT100, Correction := g_iCorrTprod4);
-AI_TProd4 := FLT10(fbScaleRtd.ValueOut);
+AI_fTProd4 := FLT10(fbScaleRtd.ValueOut);
 
 (* Средняя температура продукта (для HMI, D14; REAL — точнее, чем INT) *)
-AI_TProdAvg := (AI_TProd1 + AI_TProd2 + AI_TProd3 + AI_TProd4) / 4.0;
+AI_fTProdAvg := (AI_fTProd1 + AI_fTProd2 + AI_fTProd3 + AI_fTProd4) / 4.0;
 
 (* ════════════════════════════════════════════════════════════════
    ЧАСТЬ 2. ТРЕВОГИ ALARMMANAGER V203 (код бывшего FB_ALARMS)
@@ -106,8 +108,8 @@ AI_TProdAvg := (AI_TProd1 + AI_TProd2 + AI_TProd3 + AI_TProd4) / 4.0;
    - РД-ДД200 — контакт НЗ: «поток есть» = вход 0, «нет потока» = вход 1.
 
    Обрыв 4-20 мА ПВТ110 определяется по СЫРЫМ значениям host-входов
-   (метки AI_RAW_TChamber/AI_RAW_HChamber, т.е. D8032/D8033, значение ≥ 32720).
-   Масштабированные значения — в AI_TChamber/AI_HChamber (D1/D2).
+   (метки AI_iRawTChamber/AI_iRawHChamber, т.е. D8032/D8033, значение ≥ 32720).
+   Масштабированные значения — в AI_fTChamber/AI_fHChamber (D2–D5).
    Обрыв датчика улицы (0-10 В) — по ErrWire из части 1 (g_xErrTout, M552).
    Порог относится ТОЛЬКО к host-входам (см. план §4, п.5).
 *)
@@ -141,27 +143,27 @@ fbAMSet(iNum := 17, xState := DO_FanH5 AND NOT DI_FanHFb5);
 fbAMSet(iNum := 18, xState := DO_FanH6 AND NOT DI_FanHFb6);
 
 (* 19–22: обрыв Pt100 — щупы продукта 1–4 (значение ≤ −190 °C) *)
-fbAMSet(iNum := 19, xState := AI_TProd1 <= -1900);
-fbAMSet(iNum := 20, xState := AI_TProd2 <= -1900);
-fbAMSet(iNum := 21, xState := AI_TProd3 <= -1900);
-fbAMSet(iNum := 22, xState := AI_TProd4 <= -1900);
+fbAMSet(iNum := 19, xState := AI_fTProd1 <= -1900);
+fbAMSet(iNum := 20, xState := AI_fTProd2 <= -1900);
+fbAMSet(iNum := 21, xState := AI_fTProd3 <= -1900);
+fbAMSet(iNum := 22, xState := AI_fTProd4 <= -1900);
 
 (* 23: обрыв датчика улицы (0-10 В) — ErrWire из части 1 *)
 fbAMSet(iNum := 23, xState := g_xErrTout);
 
 (* 24–25: обрыв 4-20 мА ПВТ110 (host: t° камеры, влажность, ≥ 32720) *)
-fbAMSet(iNum := 24, xState := AI_RAW_TChamber >= 32720);
-fbAMSet(iNum := 25, xState := AI_RAW_HChamber >= 32720);
+fbAMSet(iNum := 24, xState := AI_iRawTChamber >= 32720);
+fbAMSet(iNum := 25, xState := AI_iRawHChamber >= 32720);
 
 (* 26: температура продукта выше максимума (любой из 4 щупов) *)
-fbAMSet(iNum := 26, xState := (AI_TProd1 > g_iTprodMax) OR
-                              (AI_TProd2 > g_iTprodMax) OR
-                              (AI_TProd3 > g_iTprodMax) OR
-                              (AI_TProd4 > g_iTprodMax));
+fbAMSet(iNum := 26, xState := (AI_fTProd1 > g_iTprodMax) OR
+                              (AI_fTProd2 > g_iTprodMax) OR
+                              (AI_fTProd3 > g_iTprodMax) OR
+                              (AI_fTProd4 > g_iTprodMax));
 
 (* 27: влажность ниже минимума (исключая обрыв 4-20 мА) *)
-fbAMSet(iNum := 27, xState := (AI_HChamber < g_iHmin) AND
-                              (AI_RAW_HChamber < 32720));
+fbAMSet(iNum := 27, xState := (AI_fHChamber < g_iHmin) AND
+                              (AI_iRawHChamber < 32720));
 
 (* ── Сводные флаги для логики и HMI ──────────────────────────── *)
 fbAMHas(iProcessNum := 0, iSeverity := 0, Q := g_xAnyAlarm, AC := g_iAlarmCount);
