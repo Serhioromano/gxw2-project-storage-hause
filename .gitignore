@@ -1,0 +1,19 @@
+# ОС
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# OneDrive временные файлы
+*.tmp
+~$*
+.~lock.*
+
+# GX Works 2 / резервные копии
+*.bak
+*.tmp
+backup/
+
+# Логи и редакторы
+*.log
+.vscode/
+.idea/
