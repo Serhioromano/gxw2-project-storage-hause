@@ -32,9 +32,8 @@ EI(TRUE);
    запись не выполняется вообще — они остаются как есть. *)
 
 IF g_iIntensity = 0 THEN g_iIntensity := 1; END_IF;   (* 600 мин рециркуляции *)
-IF g_iToutMin = 0 THEN g_iToutMin := 30; END_IF;      (* 3.0 °C — мин. t улицы *)
-IF g_iToutMax = 0 THEN g_iToutMax := 250; END_IF;     (* 25.0 °C — макс. t улицы *)
-IF g_iTpreheat = 0 THEN g_iTpreheat := 50; END_IF;    (* 5.0 °C — подогрев заслонок *)
+IF g_iToutAsper = 0 THEN g_iToutAsper := 30; END_IF;  (* 3.0 °C — мин. t улицы для аспирации *)
+IF g_iToutHeat = 0 THEN g_iToutHeat := 50; END_IF;   (* 5.0 °C — мин. t улицы для подогрева заслонок *)
 IF g_iPreheatTime = 0 THEN g_iPreheatTime := 180; END_IF; (* 180 с — предподогрев *)
 IF g_iStartDelay = 0 THEN g_iStartDelay := 3; END_IF;    (* 3 с — пуск вентиляторов *)
 IF g_iManualAspMin = 0 THEN g_iManualAspMin := 5; END_IF; (* 5 мин — ручн. аспирация *)
@@ -51,9 +50,6 @@ IF g_iAutoResetDelay = 0 THEN g_iAutoResetDelay := 60; END_IF; (* 60 мин — 
 (* Настройки Modbus slave (порт 2): заводские значения применяются
    только если текущее значение = 0; изменения с HMI сохраняются. *)
 IF g_iMbAddr = 0 THEN g_iMbAddr := 1; END_IF;        (* адрес 1 *)
-IF g_iMbParity = 0 THEN g_iMbParity := 0; END_IF;    (* 0 = без чётности (NONE) *)
-IF g_iMbStopBit = 0 THEN g_iMbStopBit := 1; END_IF;  (* 1 стоп-бит *)
-IF g_iMbBaud = 0 THEN g_iMbBaud := 9600; END_IF;     (* 9600 бит/с *)
 
 (* ── AlarmManager V203: конфигурация тревог (28 шт.) ────────
    Нумерация 0–27, задержки в единицах 50 мс (тик TCO_TICKER_50).

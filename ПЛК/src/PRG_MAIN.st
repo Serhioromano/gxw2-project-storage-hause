@@ -67,7 +67,7 @@ g_iModeCoarse := SEL(DI_ModePurge, SEL(DI_ModeAuto, 0, 1), 2);
 
 (* для HMI: 0=Выкл, 1=Рециркуляция, 2=Продувка, 3=Аспирация *)
 g_iModeDisp := g_iModeCoarse;
-MOV(iState >= 200, g_iModeDisp, 3); (* Аспирация *)
+MOV(iState >= 200, 3, g_iModeDisp); (* Аспирация *)
 
 (* Если выключили во время аспирации *)
 MOV(g_iModeCoarse = 0 AND iState >= 200, STATE_RESET, iState);
