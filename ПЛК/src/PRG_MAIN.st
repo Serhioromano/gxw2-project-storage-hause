@@ -18,7 +18,7 @@
   блока статусов HMI не требуется.
 
   Локальные переменные — в PRG_MAIN.csv.
-*)
+ *)
 
 (* Разрешение прерываний (EI) — первая строка каждой программы *)
 EI(TRUE);
@@ -27,11 +27,18 @@ EI(TRUE);
    ЧАСТЬ 1. КОНЕЧНЫЙ АВТОМАТ (код бывшего FB_PROCESS)
    ════════════════════════════════════════════════════════════════
    Состояния (g_iStep, D534 — для отладки/HMI):
-      0   — IDLE (Выключено / Продувка; автомат неактивен)
-    100   — РЕЦИРКУЛЯЦИЯ (основное состояние)
-    200   — ПОДГОТОВКА К АСПИРАЦИИ (Y00=1, клапаны, задержка пуска)
-    300   — АСПИРАЦИЯ (все 10 вентиляторов, обратный отсчёт)
-    400   — ЗАВЕРШЕНИЕ (закрыть приток/сброс, открыть рециркуляцию, Y00=0)
+      0 — СБРОС (однократный сброс выходов, безусловный переход в 2)
+      2 — ОЖИДАНИЕ (Выключено; ожидание команды режима)
+     50 — ПРОДУВКА (рециркуляция открыта, вентиляторы — вручную)
+    100 — РЕЦИРКУЛЯЦИЯ (основное состояние)
+    200 — ПОДГОТОВКА К АСПИРАЦИИ (Y00=1, клапаны, задержка пуска)
+    300 — АСПИРАЦИЯ (все 10 вентиляторов, обратный отсчёт)
+    400 — ЗАВЕРШЕНИЕ (закрыть приток/сброс, открыть рециркуляцию, Y00=0)
+
+  Структура (по решению ревью): шаг 0 — только сброс, безусловно → 2;
+  шаг 2 (ОЖИДАНИЕ) ждёт команду режима: Продувка → 50, Авто → 100,
+  ручная аспирация → 200; при «Выключено» остаёмся в 2.
+  Выход из «Авто» (100–400) при сигнале «не Авто» → шаг 0 → 2.
 
   Логика по плану §6.4:
   - рециркуляция: длительность по интенсивности (1200/600/300 мин),
@@ -44,252 +51,174 @@ EI(TRUE);
 
   Ручная аспирация (HMI: g_xManualAspCmd + g_iManualAspMin):
   - приоритет над регулярной; работает из любого режима;
-  - по завершении возврат: в Авто — в рециркуляцию, иначе — в IDLE.
+  - по завершении возврат: в Авто — в рециркуляцию, иначе — в ОЖИДАНИЕ (2).
 
   Блокирующая тревога (g_xAnyBlock — реле фаз) НЕ останавливает автомат:
   блокируются только напорные вентиляторы (380 В). Разгонные (220 В)
   реле контроля фаз не затрагивает (ТЗ §7.6, v1.2).
-*)
+ *)
 
-(* Грубый выбор режима по переключателю *)
-IF DI_ModePurge THEN
-    g_iModeCoarse := 3;              (* Продувка — приоритет *)
-ELSIF DI_ModeAuto THEN
-    g_iModeCoarse := 1;              (* Авто *)
-ELSE
-    g_iModeCoarse := 0;              (* Выключено *)
-END_IF;
+(* Грубый выбор режима по переключателю
+0 - Off
+1 - Рециркуляция
+2 - Продувка
+ *)
+g_iModeCoarse := SEL(DI_ModePurge, SEL(DI_ModeAuto, 0, 1), 2);
 
+(* для HMI: 0=Выкл, 1=Рециркуляция, 2=Продувка, 3=Аспирация *)
+g_iModeDisp := g_iModeCoarse;
+MOV(iState >= 200, g_iModeDisp, 3); (* Аспирация *)
 
-(* ── Блокирующая тревога (реле фаз) ─────────────────────────────
-   Реле контроля фаз (X02) защищает трёхфазные двигатели 380 В —
-   напорные вентиляторы. Автомат при РКФ НЕ сбрасывается: разгонные
-   вентиляторы (220 В, 1-фазные) РКФ не затрагивает, а напорные
-   блокируются на уровне команд DO — см. часть «Приводы». *)
-
-(* ── Смена режима не в «Авто» (без активной ручной аспирации) → IDLE *)
-IF g_iModeCoarse <> 1 AND NOT g_xManualAspActive AND iState <> 0 THEN
-    iState := 0;
-END_IF;
+(* Если выключили во время аспирации *)
+MOV(g_iModeCoarse = 0 AND iState >= 200. STATE_RESET, iState);
 
 (* ── Фронт входа в состояние (однократные действия) ──────────── *)
-IF iState <> iPrevState THEN
-    xEntry := TRUE;
-    iPrevState := iState;
-ELSE
-    xEntry := FALSE;
+xEntry := MEP(iState <> iPrevState);
+iPrevState := iState;
+
+(* Ручная аспирация из Выключено (возврат в этот же режим) *)
+IF MEP(g_xManualAspCmd) THEN
+    IF g_iModeDisp = 1 THEN
+        g_xManualAspActive := TRUE;
+        iState := STATE_PREPARE; (* подготовка к аспирации *)
+    ELSE
+        g_xManualAspCmd := FALSE; (* игнор команды, если уже в аспирации *)
+        iState := STATE_PREPARE; (* подготовка к аспирации *)
+    END_IF;
 END_IF;
 
-CASE iState OF
+STATE_RESET := 0;
+STATE_IDLE := 2;
+STATE_PURGE := 50;
+STATE_RECIRC := 100;
+STATE_PREPARE := 200;
+STATE_PREHEAT := 210;
+STATE_ASPIRATE := 300;
 
-0:  (* IDLE: Выключено / Продувка *)
-    (* Вентиляторы ПЛК НЕ управляет (в Продувке — вручную оператором) *)
+(* 0=низкая, 1=средняя, 2=высокая *)
+g_iIntensity := LIMITATION(0, g_iIntensity, 2);
+
+CASE iState OF
+0: (* СБРОС: все выходы в безопасное состояние, безусловно → 2 *)
+    (* Вентиляторы выключены, клапаны закрыты, подогрев выключен,
+       холод не блокируется *)
     g_xCmdFanH1 := FALSE; g_xCmdFanH2 := FALSE;
     g_xCmdFanH3 := FALSE; g_xCmdFanH4 := FALSE;
     g_xCmdFanH5 := FALSE; g_xCmdFanH6 := FALSE;
     g_xCmdFanR1 := FALSE; g_xCmdFanR2 := FALSE;
     g_xCmdFanR3 := FALSE; g_xCmdFanR4 := FALSE;
-
-    (* Клапаны: Продувка — рециркуляция открыта; Выключено — все закрыты *)
-    IF g_iModeCoarse = 3 THEN
-        g_xCmdValveRec1 := TRUE;
-        g_xCmdValveRec2 := TRUE;
-    ELSE
-        g_xCmdValveRec1 := FALSE;
-        g_xCmdValveRec2 := FALSE;
-    END_IF;
-    g_xCmdValveIn1 := FALSE;  g_xCmdValveIn2 := FALSE;
+    g_xCmdValveIn1 := FALSE; g_xCmdValveIn2 := FALSE;
     g_xCmdValveOut1 := FALSE; g_xCmdValveOut2 := FALSE;
-
-    (* Подогрев выключен, холод не блокируется *)
-    g_xCmdHeatIn1 := FALSE;  g_xCmdHeatIn2 := FALSE;
-    g_xCmdHeatOut1 := FALSE; g_xCmdHeatOut2 := FALSE;
-    g_xCmdCoolerStop := FALSE;
-
-    g_iModeDisp := g_iModeCoarse;
-
-    (* Вход в «Авто» *)
-    IF g_iModeCoarse = 1 THEN
-        iState := 100;
-    END_IF;
-
-    (* Ручная аспирация из Выключено/Продувки (возврат в этот же режим) *)
-    IF MEP(g_xManualAspCmd) AND g_iModeCoarse <> 1 THEN
-        g_xManualAspActive := TRUE;
-        iAspTarget := g_iManualAspMin * 60;
-        iState := 200;
-    END_IF;
-
-100: (* РЕЦИРКУЛЯЦИЯ *)
-    IF xEntry THEN
-        (* Длительность рециркуляции по интенсивности (план §6.4) *)
-        CASE g_iIntensity OF
-            0: g_iRecircLeft := 1200;   (* Слабо: 20 ч *)
-            2: g_iRecircLeft := 300;    (* Интенсивно: 5 ч *)
-            ELSE
-               g_iRecircLeft := 600;    (* Нормально: 10 ч *)
-        END_CASE;
-    END_IF;
-
-    (* Клапаны: рециркуляция открыта, приток/сброс закрыты *)
-    g_xCmdValveIn1 := FALSE;  g_xCmdValveIn2 := FALSE;
-    g_xCmdValveOut1 := FALSE; g_xCmdValveOut2 := FALSE;
-    g_xCmdValveRec1 := TRUE;  g_xCmdValveRec2 := TRUE;
-
-    (* Холод разрешён; подогрев выключен *)
-    g_xCmdCoolerStop := FALSE;
-    g_xCmdHeatIn1 := FALSE;  g_xCmdHeatIn2 := FALSE;
-    g_xCmdHeatOut1 := FALSE; g_xCmdHeatOut2 := FALSE;
-    (* Вентиляторы в рециркуляции следуют за X20 — см. ниже, «Приводы» *)
-
-    (* Ручная аспирация прерывает цикл *)
-    IF MEP(g_xManualAspCmd) THEN
-        g_xManualAspActive := TRUE;
-        iAspTarget := g_iManualAspMin * 60;
-        iState := 200;
-    END_IF;
-
-    (* Тик 1 мин (M8014) — обратный отсчёт рециркуляции *)
-    IF MEP(M8014) THEN
-        g_iRecircLeft := g_iRecircLeft - 1;
-        IF g_iRecircLeft <= 0 THEN
-            iAspTarget := 300;          (* регулярная аспирация 5 мин *)
-            iState := 200;
-        END_IF;
-    END_IF;
-
-    g_iModeDisp := 1;
-
-200: (* ПОДГОТОВКА К АСПИРАЦИИ *)
-    IF xEntry THEN
-        xAspEntry := TRUE;
-    END_IF;
-
-    IF xAspEntry THEN
-        xAspEntry := FALSE;
-        (* Проверка t улицы — только для регулярной аспирации *)
-        IF (NOT g_xManualAspActive) AND
-           (AI_fTOutside < FLT10(g_iToutMin) OR
-            AI_fTOutside > FLT10(g_iToutMax)) THEN
-            iState := 100;              (* пропуск цикла *)
-            xSkip := TRUE;
-        ELSE
-            xSkip := FALSE;
-            iFinishLeft := g_iStartDelay;  (* задержка пуска вентиляторов *)
-            IF AI_fTOutside < FLT10(g_iTpreheat) THEN
-                iPreheatLeft := g_iPreheatTime;
-            ELSE
-                iPreheatLeft := 0;
-            END_IF;
-        END_IF;
-    END_IF;
-
-    IF NOT xSkip THEN
-        (* Холод остановлен *)
-        g_xCmdCoolerStop := TRUE;
-        (* Клапаны: приток/сброс открыть, рециркуляцию закрыть *)
-        g_xCmdValveIn1 := TRUE;  g_xCmdValveIn2 := TRUE;
-        g_xCmdValveOut1 := TRUE; g_xCmdValveOut2 := TRUE;
-        g_xCmdValveRec1 := FALSE; g_xCmdValveRec2 := FALSE;
-        (* Подогрев заслонок (при t улицы ниже порога) *)
-        g_xCmdHeatIn1 := (iPreheatLeft > 0);
-        g_xCmdHeatIn2 := (iPreheatLeft > 0);
-        g_xCmdHeatOut1 := (iPreheatLeft > 0);
-        g_xCmdHeatOut2 := (iPreheatLeft > 0);
-        (* Вентиляторы выключены (задержка пуска) *)
-        g_xCmdFanH1 := FALSE; g_xCmdFanH2 := FALSE;
-        g_xCmdFanH3 := FALSE; g_xCmdFanH4 := FALSE;
-        g_xCmdFanH5 := FALSE; g_xCmdFanH6 := FALSE;
-        g_xCmdFanR1 := FALSE; g_xCmdFanR2 := FALSE;
-        g_xCmdFanR3 := FALSE; g_xCmdFanR4 := FALSE;
-
-        (* Тик 1 с (M8013) *)
-        IF MEP(M8013) THEN
-            IF iPreheatLeft > 0 THEN
-                iPreheatLeft := iPreheatLeft - 1;
-            END_IF;
-            iFinishLeft := iFinishLeft - 1;
-            IF iFinishLeft <= 0 THEN
-                iState := 300;
-            END_IF;
-        END_IF;
-    END_IF;
-
-    g_iModeDisp := 2;
-
-300: (* АСПИРАЦИЯ *)
-    IF xEntry THEN
-        g_iAspLeft := iAspTarget;
-    END_IF;
-
-    (* Холод остановлен; клапаны приток/сброс открыты *)
-    g_xCmdCoolerStop := TRUE;
-    g_xCmdValveIn1 := TRUE;  g_xCmdValveIn2 := TRUE;
-    g_xCmdValveOut1 := TRUE; g_xCmdValveOut2 := TRUE;
     g_xCmdValveRec1 := FALSE; g_xCmdValveRec2 := FALSE;
-    (* Подогрев продолжается до истечения таймера *)
-    g_xCmdHeatIn1 := (iPreheatLeft > 0);
-    g_xCmdHeatIn2 := (iPreheatLeft > 0);
-    g_xCmdHeatOut1 := (iPreheatLeft > 0);
-    g_xCmdHeatOut2 := (iPreheatLeft > 0);
-    (* Все 10 вентиляторов включены (независимо от X20) *)
+    g_xCmdHeatIn1 := FALSE; g_xCmdHeatIn2 := FALSE;
+    g_xCmdHeatOut1 := FALSE; g_xCmdHeatOut2 := FALSE;
+    g_xCmdCoolerStop := FALSE;
+    g_xManualAspActive := FALSE;
+
+    g_iPreheatLeft := 0; g_iAspLeft := 0; g_iRecircLeft := 0;
+
+    iState := STATE_IDLE; (* безусловный переход в ОЖИДАНИЕ *)
+
+2: (* ОЖИДАНИЕ Выключено: ждём команду режима *)
+    (* Команды режима: Продувка → 50, Авто → 100 *)
+    IF g_iModeCoarse = 1 THEN
+        iState := STATE_RECIRC;
+    ELSIF g_iModeCoarse = 2 THEN
+        iState := STATE_PURGE;
+    END_IF;
+
+50: (* ПРОДУВКА: рециркуляция открыта, вентиляторы — вручную *)
+    (* Команды режима: Выключено → через сброс в ОЖИДАНИЕ, Авто → 100 *)
     g_xCmdFanH1 := TRUE; g_xCmdFanH2 := TRUE;
     g_xCmdFanH3 := TRUE; g_xCmdFanH4 := TRUE;
     g_xCmdFanH5 := TRUE; g_xCmdFanH6 := TRUE;
     g_xCmdFanR1 := TRUE; g_xCmdFanR2 := TRUE;
     g_xCmdFanR3 := TRUE; g_xCmdFanR4 := TRUE;
 
-    (* Тик 1 с (M8013) — обратный отсчёт аспирации *)
-    IF MEP(M8013) THEN
-        IF iPreheatLeft > 0 THEN
-            iPreheatLeft := iPreheatLeft - 1;
-        END_IF;
-        g_iAspLeft := g_iAspLeft - 1;
-        IF g_iAspLeft <= 0 THEN
-            iState := 400;
-        END_IF;
+    (* Клапаны: рециркуляция открыта, приток/сброс закрыты *)
+    g_xCmdValveRec1 := TRUE; g_xCmdValveRec2 := TRUE;
+
+    IF g_iModeCoarse <> 2 THEN
+        iState := STATE_RESET;
     END_IF;
 
-    g_iModeDisp := 2;
+100: (* РЕЦИРКУЛЯЦИЯ *)
+    g_xCmdFanH1 := DI_CoolerRun; g_xCmdFanH2 := DI_CoolerRun;
+    g_xCmdFanH3 := DI_CoolerRun; g_xCmdFanH4 := DI_CoolerRun;
+    g_xCmdFanH5 := DI_CoolerRun; g_xCmdFanH6 := DI_CoolerRun;
+    g_xCmdFanR1 := DI_CoolerRun; g_xCmdFanR2 := DI_CoolerRun;
+    g_xCmdFanR3 := DI_CoolerRun; g_xCmdFanR4 := DI_CoolerRun;
 
-400: (* ЗАВЕРШЕНИЕ АСПИРАЦИИ *)
-    IF xEntry THEN
-        iFinishLeft := 3;   (* пауза на закрытие клапанов *)
+    (* Клапаны: рециркуляция открыта, приток/сброс закрыты *)
+    g_xCmdValveRec1 := TRUE; g_xCmdValveRec2 := TRUE;
+
+    IF g_iModeCoarse <> 1 THEN
+        iState := STATE_RESET;
     END_IF;
 
-    (* Возврат к рециркуляции: холод разрешён, рециркуляция открыта *)
-    g_xCmdCoolerStop := FALSE;
-    g_xCmdValveIn1 := FALSE;  g_xCmdValveIn2 := FALSE;
-    g_xCmdValveOut1 := FALSE; g_xCmdValveOut2 := FALSE;
-    g_xCmdValveRec1 := TRUE;  g_xCmdValveRec2 := TRUE;
-    g_xCmdHeatIn1 := FALSE;  g_xCmdHeatIn2 := FALSE;
-    g_xCmdHeatOut1 := FALSE; g_xCmdHeatOut2 := FALSE;
-    (* Вентиляторы выключены *)
-    g_xCmdFanH1 := FALSE; g_xCmdFanH2 := FALSE;
-    g_xCmdFanH3 := FALSE; g_xCmdFanH4 := FALSE;
-    g_xCmdFanH5 := FALSE; g_xCmdFanH6 := FALSE;
-    g_xCmdFanR1 := FALSE; g_xCmdFanR2 := FALSE;
-    g_xCmdFanR3 := FALSE; g_xCmdFanR4 := FALSE;
-
-    (* Тик 1 с (M8013) *)
-    IF MEP(M8013) THEN
-        iFinishLeft := iFinishLeft - 1;
-        IF iFinishLeft <= 0 THEN
-            g_xManualAspActive := FALSE;
-            IF g_iModeCoarse = 1 THEN
-                iState := 100;          (* возврат в рециркуляцию *)
-            ELSE
-                iState := 0;            (* возврат в предыдущий режим *)
-            END_IF;
-        END_IF;
+    (* Тик 1 мин (M8014) — обратный отсчёт рециркуляции *)
+    INCP(M8014, g_iRecircLeft);
+    IF g_iRecircLeft >= astIntens[g_iIntensity].RECIRC THEN
+        g_iRecircLeft := 0; (* сброс счётчика рециркуляции *)
+        iState := STATE_PREPARE;
     END_IF;
 
-    g_iModeDisp := 2;
+200: (* ПОДГОТОВКА К АСПИРАЦИИ *)
+    IF AI_fTOutside <= FLT10(g_iToutHeat) THEN
+        g_xCmdHeatIn1 := TRUE;
+        g_xCmdHeatIn2 := TRUE;
+        g_xCmdHeatOut1 := TRUE;
+        g_xCmdHeatOut2 := TRUE;
+        iState := STATE_PREHEAT; (* Подогрев *)
+    ELSE
+        iState := STATE_ASPER; (* Аспирация *)
+    END_IF;
+
+    IF g_xManualAspActive THEN
+        iAspTarget := g_iManualAspMin; (* ручная аспирация: мин. время *)
+    ELSE
+        iAspTarget := astIntens[g_iIntensity].ASPER; (* регулярная аспирация: 5 мин *)
+    END_IF;
+
+    (* Если температура outside не превышает порог аспирации не будет иначе заморозим продукт *)
+    IF AI_fTOutside <= FLT10(g_iToutAsper) THEN
+        g_xCmdHeatIn1 := FALSE;
+        g_xCmdHeatIn2 := FALSE;
+        g_xCmdHeatOut1 := FALSE;
+        g_xCmdHeatOut2 := FALSE;
+        iState := STATE_RESET; 
+    END_IF;
+
+210: (* ПОДОГРЕВ ЗАСЛОНОК *)
+    INCP(M8014, g_iPreheatLeft);
+    IF g_iPreheatLeft >= g_iPreheatTime THEN
+        g_iPreheatLeft := 0; (* сброс счётчика подогрева *)
+        g_xCmdHeatIn1 := FALSE;
+        g_xCmdHeatIn2 := FALSE;
+        g_xCmdHeatOut1 := FALSE;
+        g_xCmdHeatOut2 := FALSE;
+
+        (* Холод остановлен *)
+        g_xCmdCoolerStop := TRUE;
+
+        (* Клапаны: приток/сброс открыть, рециркуляцию закрыть *)
+        g_xCmdValveIn1 := TRUE; g_xCmdValveIn2 := TRUE;
+        g_xCmdValveOut1 := TRUE; g_xCmdValveOut2 := TRUE;
+        g_xCmdValveRec1 := FALSE; g_xCmdValveRec2 := FALSE;
+
+        iState := STATE_ASPER; (* Аспирация *)
+    END_IF;
+
+300: (* АСПИРАЦИЯ *)
+    INCP(M8014, g_iAspLeft);
+    IF g_iAspLeft >= iAspTarget THEN
+        g_iAspLeft := 0; (* сброс счётчика аспирации *)
+        iState := STATE_RESET; (* Завершение аспирации *)
+    END_IF;
 
 ELSE
-    (* Неизвестное состояние — сброс в IDLE (страховка) *)
+    (* Неизвестное состояние — сброс в шаг 0 (СБРОС), страховка *)
     iState := 0;
-
 END_CASE;
 
 (* Номер состояния автомата — для отладки и HMI *)
@@ -311,44 +240,35 @@ g_iStep := iState;
      ТОЛЬКО напорных вентиляторов (380 В); разгонные (220 В, 1-фазн.)
      РКФ не блокирует (ТЗ §7.6, v1.2);
    - в «Продувке» вентиляторами управляет оператор вручную — команды
-     автомата в этом режиме равны FALSE (см. выше, состояние IDLE).
-*)
+     автомата в этом режиме равны FALSE (см. выше, состояние ПРОДУВКА).
+ *)
 
 (* ── Вентиляторы: команда автомата; при РКФ блок только напорных ─ *)
-DO_FanH1 := g_xCmdFanH1 AND NOT g_xAnyBlock;
-DO_FanH2 := g_xCmdFanH2 AND NOT g_xAnyBlock;
-DO_FanH3 := g_xCmdFanH3 AND NOT g_xAnyBlock;
-DO_FanH4 := g_xCmdFanH4 AND NOT g_xAnyBlock;
-DO_FanH5 := g_xCmdFanH5 AND NOT g_xAnyBlock;
-DO_FanH6 := g_xCmdFanH6 AND NOT g_xAnyBlock;
-(* Разгонные 220 В: РКФ (трёхфазная защита) их не блокирует *)
-DO_FanR1 := g_xCmdFanR1;
-DO_FanR2 := g_xCmdFanR2;
-DO_FanR3 := g_xCmdFanR3;
-DO_FanR4 := g_xCmdFanR4;
+fbTOF1(IN := g_xCmdFanH1, PT := T#3s, Q := DO_FanH1);
+fbTOF2(IN := g_xCmdFanH2, PT := T#3s, Q := DO_FanH2);
+fbTOF3(IN := g_xCmdFanH3, PT := T#3s, Q := DO_FanH3);
+fbTOF4(IN := g_xCmdFanH4, PT := T#3s, Q := DO_FanH4);
+fbTOF5(IN := g_xCmdFanH5, PT := T#3s, Q := DO_FanH5);
+fbTOF6(IN := g_xCmdFanH6, PT := T#3s, Q := DO_FanH6);
+fbTOF7(IN := g_xCmdFanR1, PT := T#3s, Q := DO_FanR1);
+fbTOF8(IN := g_xCmdFanR2, PT := T#3s, Q := DO_FanR2);
+fbTOF9(IN := g_xCmdFanR3, PT := T#3s, Q := DO_FanR3);
+fbTOF10(IN := g_xCmdFanR4, PT := T#3s, Q := DO_FanR4);
 
-(* ── Рециркуляция: вентиляторы следуют за охладителем (X20) ─────
-   Напорные — с блокировкой при РКФ, разгонные — без неё. *)
-IF g_iModeDisp = 1 THEN
-    DO_FanH1 := DI_CoolerRun AND NOT g_xAnyBlock;
-    DO_FanH2 := DI_CoolerRun AND NOT g_xAnyBlock;
-    DO_FanH3 := DI_CoolerRun AND NOT g_xAnyBlock;
-    DO_FanH4 := DI_CoolerRun AND NOT g_xAnyBlock;
-    DO_FanH5 := DI_CoolerRun AND NOT g_xAnyBlock;
-    DO_FanH6 := DI_CoolerRun AND NOT g_xAnyBlock;
-    DO_FanR1 := DI_CoolerRun;
-    DO_FanR2 := DI_CoolerRun;
-    DO_FanR3 := DI_CoolerRun;
-    DO_FanR4 := DI_CoolerRun;
-END_IF;
+DO_FanH1 := DO_FanH1 AND NOT g_xAnyBlock;
+DO_FanH2 := DO_FanH2 AND NOT g_xAnyBlock;
+DO_FanH3 := DO_FanH3 AND NOT g_xAnyBlock;
+DO_FanH4 := DO_FanH4 AND NOT g_xAnyBlock;
+DO_FanH5 := DO_FanH5 AND NOT g_xAnyBlock;
+DO_FanH6 := DO_FanH6 AND NOT g_xAnyBlock;
 
 (* ── Клапаны (Belimo: питание = открыть, пружина = закрыть) ───── *)
-DO_VlvIn1Open := g_xCmdValveIn1;
-DO_VlvIn2Open := g_xCmdValveIn2;
-DO_VlvOut1Open := g_xCmdValveOut1;
-DO_VlvOut2Open := g_xCmdValveOut2;
-DO_VlvRec1Open := g_xCmdValveRec1;
-DO_VlvRec2Open := g_xCmdValveRec2;
+fbTOF11(IN := g_xCmdValveIn1, PT := T#3s, Q := DO_VlvIn1Open);
+fbTOF12(IN := g_xCmdValveIn2, PT := T#3s, Q := DO_VlvIn2Open);
+fbTOF13(IN := g_xCmdValveOut1, PT := T#3s, Q := DO_VlvOut1Open);
+fbTOF14(IN := g_xCmdValveOut2, PT := T#3s, Q := DO_VlvOut2Open);
+fbTOF15(IN := g_xCmdValveRec1, PT := T#3s, Q := DO_VlvRec1Open);
+fbTOF16(IN := g_xCmdValveRec2, PT := T#3s, Q := DO_VlvRec2Open);    
 
 (* ── Подогрев заслонок приток/сброс ──────────────────────────── *)
 DO_HeatVlvIn1 := g_xCmdHeatIn1;
