@@ -20,9 +20,9 @@
 | `plnas/план_разработки.md` | **План разработки** — читать первым, следовать этапам |
 | `Ссылки/тз_финальное.md` | Техническое задание (черновик v1) |
 | `Ссылки/плк.txt` | Карта адресов привязки в ПЛК (X/Y/D/R) |
-| `Ссылки/AlarmManagerV203.md` | Библиотека тревог (AM_INIT/AM_SET/AM_PACK...) |
-| `Ссылки/Modbus.EN.md` | Modbus RTU slave/master (MB_CHANNELS) |
-| `Ссылки/UtilsV3.md` | Utils: SCALE_AI, L02_SCALE_AI, HYST, SCALE и др. |
+| `/mnt/c/Users/Serhioromano/OneDrive/ShareDocumentation/#Общее/coolmay/gxw2-libraries/libraries/AlarmManager/AlarmManager.md` | Библиотека тревог (AM_INIT/AM_SET/AM_PACK...) |
+| `/mnt/c/Users/Serhioromano/OneDrive/ShareDocumentation/#Общее/coolmay/gxw2-libraries/libraries/ModbusDriver/Modbus.md` | Modbus RTU slave/master (MB_CHANNELS) |
+| `/mnt/c/Users/Serhioromano/OneDrive/ShareDocumentation/#Общее/coolmay/gxw2-libraries/libraries/Utils/Utils.md` | Utils: SCALE_AI, L02_SCALE_AI, HYST, SCALE и др. |
 | `ПЛК/*.st` | Исходники программы (по одному файлу на POU) |
 | `plnas/вопросы_заказчику.md` | Открытые вопросы заказчику (этап 1) |
 
