@@ -7,7 +7,7 @@
     1) слой аналоговых входов (код бывшего FB_IO): масштабирование
        7 каналов, коррекции, обрывы; выходы блоков масштабирования (INT, ×10)
        через функцию FLT10 → глобальные REAL-переменные AI_f* (для HMI-графиков);
-    2) тревоги AlarmManager V212 (код бывшего FB_ALARMS): FB_AM_SET ×28,
+    2) тревоги AlarmManager V212 (код бывшего FB_ALARMS): FB_AM_SET ×34,
        сводные флаги, упаковка для HMI, сброс/автосброс;
     3) световая колонна: вызов ФБ FB_LIGHT (единственный оставшийся ФБ);
     4) Modbus slave (порт 2, RS-485): инициализация для диспетчеризации/PUSH
@@ -113,14 +113,18 @@ AI_fTProdAvg := (AI_fTProd1 + AI_fTProd2 + AI_fTProd3 + AI_fTProd4) / 4.0;
 (* ════════════════════════════════════════════════════════════════
    ЧАСТЬ 2. ТРЕВОГИ ALARMMANAGER V212 (код бывшего FB_ALARMS)
    ════════════════════════════════════════════════════════════════
-   - регистрация условий 28 тревог (FB_AM_SET) — нумерация 0–27, план §5;
+   - регистрация условий 34 тревог (FB_AM_SET) — нумерация 0–33, план §5;
    - сводные флаги: g_xAnyAlarm (FB_AM_HAS_ALARMS), g_xAnyBlock (FB_AM_IS_BLOCK);
-   - упаковка тревог для HMI: D550 (биты 0–15), D551 (биты 16–27);
+   - упаковка тревог для HMI: D550 (биты 0–15), D551 (биты 16–31), D552 (биты 32–33);
    - сброс: ручной (кнопка HMI g_xAlarmResetHmi) и автосброс
      (g_xAutoReset = TRUE, через g_iAutoResetDelay минут).
 
-   Полярности входов (проверить при пусконаладке, см. вопросы):
-   - концевики клапанов — контакт НЗ: «открыт» = вход 0, «не открыт» = вход 1;
+   Полярности входов (проверить при пусконаладке, см. вопросы §1.3):
+   - концевики клапанов «закрыт» — контакт НО: «закрыт» = вход 1,
+     «не закрыт» = вход 0 (тревоги 28–33);
+   - концевики клапанов «открыт» — плк.txt указывает НО («открыт» = вход 1,
+     «не открыт» = вход 0), но тревоги 1–6 ниже всё ещё закодированы под
+     прежнюю НЗ-полярность — привести к НО после подтверждения на стенде;
    - РД-ДД200 — контакт НЗ: «поток есть» = вход 0, «нет потока» = вход 1.
 
    Обрывы host-датчиков (23–25) регистрируются по fbScaleHost.ErrWire
@@ -140,6 +144,16 @@ fbAMSet(iNum := 3, xState := DO_VlvOut1Open AND DI_VlvOut1Open);
 fbAMSet(iNum := 4, xState := DO_VlvOut2Open AND DI_VlvOut2Open);
 fbAMSet(iNum := 5, xState := DO_VlvRec1Open AND DI_VlvRec1Open);
 fbAMSet(iNum := 6, xState := DO_VlvRec2Open AND DI_VlvRec2Open);
+
+(* 28–33: клапан не закрылся — команды «открыть» нет (пружина закрывает),
+   а концевик «закрыт» (НО) не сработал. НО: DI_*Close = 1 — клапан закрыт,
+   0 — не закрыт. Полярность уточнить при пусконаладке (см. вопросы §1.3). *)
+fbAMSet(iNum := 28, xState := NOT DO_VlvIn1Open AND NOT DI_VlvIn1Close);
+fbAMSet(iNum := 29, xState := NOT DO_VlvIn2Open AND NOT DI_VlvIn2Close);
+fbAMSet(iNum := 30, xState := NOT DO_VlvOut1Open AND NOT DI_VlvOut1Close);
+fbAMSet(iNum := 31, xState := NOT DO_VlvOut2Open AND NOT DI_VlvOut2Close);
+fbAMSet(iNum := 32, xState := NOT DO_VlvRec1Open AND NOT DI_VlvRec1Close);
+fbAMSet(iNum := 33, xState := NOT DO_VlvRec2Open AND NOT DI_VlvRec2Close);
 
 (* 7–12: нет потока воздуха, напорные вентиляторы 1–6 *)
 fbAMSet(iNum := 7,  xState := DO_FanH1 AND DI_Flow1);
@@ -183,7 +197,7 @@ fbAMSet(iNum := 27, xState := (AI_fHChamber < FLT10(g_iHmin)) AND
 fbAMHas(iProcessNum := 0, iSeverity := 0, Q := g_xAnyAlarm, AC := g_iAlarmCount);
 fbAMBlock(iProcessNum := 0, iSeverity := 0, Q := g_xAnyBlock);
 
-(* ── Упаковка тревог для HMI: D550 (0–15), D551 (16–27) ──────── *)
+(* ── Упаковка тревог для HMI: D550 (0–15), D551 (16–31), D552 (32–33) ── *)
 fbAMPack(DNUM := 550, PD := c_AM_PACK_D);
 
 (* ── Сброс тревог ────────────────────────────────────────────── *)

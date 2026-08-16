@@ -9,7 +9,7 @@
   - настройки по умолчанию — применяются ТОЛЬКО если текущее значение = 0
     (первый старт / после сброса регистров); изменения с HMI сохраняются
     между перезапусками ПЛК;
-  - AlarmManager V212: конфигурация 28 тревог (FB_AM_INIT); хранилище AM_ALARMS объявлено в GVL (c_AM_ALARMS_NUM = 27);
+  - AlarmManager V212: конфигурация 34 тревог (FB_AM_INIT); хранилище AM_ALARMS объявлено в GVL (c_AM_ALARMS_NUM = 33);
   - (задел) Modbus slave для диспетчеризации/PUSH — по умолчанию отключён.
 
   Применение IP-адреса (L02_SET_IP) вынесено в MAIN — там обрабатывается
@@ -51,8 +51,8 @@ IF g_iAutoResetDelay = 0 THEN g_iAutoResetDelay := 60; END_IF; (* 60 мин — 
    только если текущее значение = 0; изменения с HMI сохраняются. *)
 IF g_iMbAddr = 0 THEN g_iMbAddr := 1; END_IF;        (* адрес 1 *)
 
-(* ── AlarmManager V212: конфигурация тревог (28 шт.) ────────
-   Нумерация 0–27, задержки в единицах 50 мс (тик TCO_TICKER_50).
+(* ── AlarmManager V212: конфигурация тревог (34 шт.) ────────
+   Нумерация 0–33, задержки в единицах 50 мс (тик TCO_TICKER_50).
    См. план §5.
    ВАЖНО (V206+): хранилище AM_ALARMS/AM_EVENTS и константы ёмкости
    c_AM_ALARMS_NUM/c_AM_EVENTS_NUM объявляет ПРИЛОЖЕНИЕ (в GVL.csv),
@@ -130,6 +130,20 @@ fbAMInit(iNum := 26, iSeverity := c_AM_ERROR, iProcess := 1, iDelay := 100,
 
 (* 27: влажность ниже минимума — Error, 5 с (iDelay 100 × 50 мс) *)
 fbAMInit(iNum := 27, iSeverity := c_AM_ERROR, iProcess := 1, iDelay := 100,
+         xLock := FALSE, xLatch := FALSE, xBuzzer := FALSE);
+
+(* 28–33: клапан не закрылся — Warning, 60 с (iDelay 1200 × 50 мс) *)
+fbAMInit(iNum := 28, iSeverity := c_AM_WARNING, iProcess := 1, iDelay := 1200,
+         xLock := FALSE, xLatch := FALSE, xBuzzer := FALSE);
+fbAMInit(iNum := 29, iSeverity := c_AM_WARNING, iProcess := 1, iDelay := 1200,
+         xLock := FALSE, xLatch := FALSE, xBuzzer := FALSE);
+fbAMInit(iNum := 30, iSeverity := c_AM_WARNING, iProcess := 1, iDelay := 1200,
+         xLock := FALSE, xLatch := FALSE, xBuzzer := FALSE);
+fbAMInit(iNum := 31, iSeverity := c_AM_WARNING, iProcess := 1, iDelay := 1200,
+         xLock := FALSE, xLatch := FALSE, xBuzzer := FALSE);
+fbAMInit(iNum := 32, iSeverity := c_AM_WARNING, iProcess := 1, iDelay := 1200,
+         xLock := FALSE, xLatch := FALSE, xBuzzer := FALSE);
+fbAMInit(iNum := 33, iSeverity := c_AM_WARNING, iProcess := 1, iDelay := 1200,
          xLock := FALSE, xLatch := FALSE, xBuzzer := FALSE);
 
 
