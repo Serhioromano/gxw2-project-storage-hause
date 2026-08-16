@@ -20,7 +20,7 @@
 | `plnas/план_разработки.md` | **План разработки** — читать первым, следовать этапам |
 | `Ссылки/тз_финальное.md` | Техническое задание (черновик v1) |
 | `Ссылки/плк.txt` | Карта адресов привязки в ПЛК (X/Y/D/R) |
-| `/mnt/c/Users/Serhioromano/OneDrive/ShareDocumentation/#Общее/coolmay/gxw2-libraries/libraries/AlarmManager/AlarmManager.md` | Библиотека тревог (AM_INIT/AM_SET/AM_PACK...) |
+| `/mnt/c/Users/Serhioromano/OneDrive/ShareDocumentation/#Общее/coolmay/gxw2-libraries/libraries/AlarmManager/AlarmManager.md` | Библиотека тревог (FB_AM_INIT/FB_AM_SET/FB_AM_PACK_ALARMS...) |
 | `/mnt/c/Users/Serhioromano/OneDrive/ShareDocumentation/#Общее/coolmay/gxw2-libraries/libraries/ModbusDriver/Modbus.md` | Modbus RTU slave/master (MB_CHANNELS) |
 | `/mnt/c/Users/Serhioromano/OneDrive/ShareDocumentation/#Общее/coolmay/gxw2-libraries/libraries/Utils/Utils.md` | Utils: SCALE_AI, L02_SCALE_AI, HYST, SCALE и др. |
 | `ПЛК/*.st` | Исходники программы (по одному файлу на POU) |
@@ -44,9 +44,9 @@
   контроля обрыва на модуле нет (детекция по значению ≤ −190 °C).
 
 **Библиотеки:** TimeControl V2 (обязательна: TCO_TICKER_50, 50 мс), AlarmManager
-V203 (задержки в 100 мс; лимиты проекта D +1400, M +2000), Modbus V1.5, Utils V3.
+V212 (задержки в 50 мс; хранилище AM_ALARMS/AM_EVENTS объявляет приложение; лимиты D +1400, M +2000 в макс. конфигурации), Modbus V1.5, Utils V3.
 
-**Тревоги (28, AM_ALARMS_NUM=28):** реле фаз (0с, X02), клапаны не открылись 6×60с,
+**Тревоги (28, c_AM_ALARMS_NUM=27):** реле фаз (0с, X02), клапаны не открылись 6×60с,
 нет потока 6×30с, пускатель напорного не замкнулся 6×3с (защёлка, ручной сброс),
 обрыв Pt100 5×3с (≤ −190 °C), обрыв 4-20мА 2×3с (≥ 32720, только host),
 t продукта выше макс (5с), влажность ниже мин (5с).
@@ -69,7 +69,7 @@ t продукта выше макс (5с), влажность ниже мин (
    оно не меняет функциональность по ТЗ.
 5. После каждого завершённого этапа — коммит в git (сообщения на русском).
 6. При работе с библиотеками сверяться с их документацией в `Ссылки/` — сигнатуры
-   ФБ, единицы задержек (100 мс), требования к лимитам устройств.
+   ФБ, единицы задержек (50 мс), требования к лимитам устройств.
 
 ## Текущее состояние
 

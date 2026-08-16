@@ -3,13 +3,13 @@
   ЗАПУСКАЕТСЯ ОДИН РАЗ при старте ПЛК (первый скан / M8002 в настройках
   задачи). НЕ вызывается из MAIN и НЕ оборачивается в IF M8002.
   Если задача запускается циклически — вернуть обёртку IF M8002,
-  иначе настройки и AM_INIT будут выполняться каждый скан.
+  иначе настройки и FB_AM_INIT будут выполняться каждый скан.
 
   Содержимое:
   - настройки по умолчанию — применяются ТОЛЬКО если текущее значение = 0
     (первый старт / после сброса регистров); изменения с HMI сохраняются
     между перезапусками ПЛК;
-  - AlarmManager V203: конфигурация 28 тревог (AM_INIT), AM_ALARMS_NUM := 28;
+  - AlarmManager V212: конфигурация 28 тревог (FB_AM_INIT); хранилище AM_ALARMS объявлено в GVL (c_AM_ALARMS_NUM = 27);
   - (задел) Modbus slave для диспетчеризации/PUSH — по умолчанию отключён.
 
   Применение IP-адреса (L02_SET_IP) вынесено в MAIN — там обрабатывается
@@ -51,83 +51,85 @@ IF g_iAutoResetDelay = 0 THEN g_iAutoResetDelay := 60; END_IF; (* 60 мин — 
    только если текущее значение = 0; изменения с HMI сохраняются. *)
 IF g_iMbAddr = 0 THEN g_iMbAddr := 1; END_IF;        (* адрес 1 *)
 
-(* ── AlarmManager V203: конфигурация тревог (28 шт.) ────────
+(* ── AlarmManager V212: конфигурация тревог (28 шт.) ────────
    Нумерация 0–27, задержки в единицах 50 мс (тик TCO_TICKER_50).
-   См. план §5. *)
-AM_ALARMS_NUM := 28;
+   См. план §5.
+   ВАЖНО (V206+): хранилище AM_ALARMS/AM_EVENTS и константы ёмкости
+   c_AM_ALARMS_NUM/c_AM_EVENTS_NUM объявляет ПРИЛОЖЕНИЕ (в GVL.csv),
+   библиотека их больше не резервирует — строки «AM_ALARMS_NUM := 28» нет. *)
 
 (* 0: реле контроля фаз — Error, мгновенно, блокирующая (стоп моторов) *)
-fbAMInit(iNum := 0, iSeverity := AM_ERROR, iProcess := 1, iDelay := 0,
+fbAMInit(iNum := 0, iSeverity := c_AM_ERROR, iProcess := 1, iDelay := 0,
          xLock := TRUE, xLatch := FALSE, xBuzzer := FALSE);
 
 (* 1–6: клапан не открылся — Warning, 60 с (iDelay 1200 × 50 мс) *)
-fbAMInit(iNum := 1, iSeverity := AM_WARNING, iProcess := 1, iDelay := 1200,
+fbAMInit(iNum := 1, iSeverity := c_AM_WARNING, iProcess := 1, iDelay := 1200,
          xLock := FALSE, xLatch := FALSE, xBuzzer := FALSE);
-fbAMInit(iNum := 2, iSeverity := AM_WARNING, iProcess := 1, iDelay := 1200,
+fbAMInit(iNum := 2, iSeverity := c_AM_WARNING, iProcess := 1, iDelay := 1200,
          xLock := FALSE, xLatch := FALSE, xBuzzer := FALSE);
-fbAMInit(iNum := 3, iSeverity := AM_WARNING, iProcess := 1, iDelay := 1200,
+fbAMInit(iNum := 3, iSeverity := c_AM_WARNING, iProcess := 1, iDelay := 1200,
          xLock := FALSE, xLatch := FALSE, xBuzzer := FALSE);
-fbAMInit(iNum := 4, iSeverity := AM_WARNING, iProcess := 1, iDelay := 1200,
+fbAMInit(iNum := 4, iSeverity := c_AM_WARNING, iProcess := 1, iDelay := 1200,
          xLock := FALSE, xLatch := FALSE, xBuzzer := FALSE);
-fbAMInit(iNum := 5, iSeverity := AM_WARNING, iProcess := 1, iDelay := 1200,
+fbAMInit(iNum := 5, iSeverity := c_AM_WARNING, iProcess := 1, iDelay := 1200,
          xLock := FALSE, xLatch := FALSE, xBuzzer := FALSE);
-fbAMInit(iNum := 6, iSeverity := AM_WARNING, iProcess := 1, iDelay := 1200,
+fbAMInit(iNum := 6, iSeverity := c_AM_WARNING, iProcess := 1, iDelay := 1200,
          xLock := FALSE, xLatch := FALSE, xBuzzer := FALSE);
 
 (* 7–12: нет потока воздуха, напорный вентилятор — Error, 30 с (iDelay 600 × 50 мс) *)
-fbAMInit(iNum := 7, iSeverity := AM_ERROR, iProcess := 1, iDelay := 600,
+fbAMInit(iNum := 7, iSeverity := c_AM_ERROR, iProcess := 1, iDelay := 600,
          xLock := FALSE, xLatch := FALSE, xBuzzer := FALSE);
-fbAMInit(iNum := 8, iSeverity := AM_ERROR, iProcess := 1, iDelay := 600,
+fbAMInit(iNum := 8, iSeverity := c_AM_ERROR, iProcess := 1, iDelay := 600,
          xLock := FALSE, xLatch := FALSE, xBuzzer := FALSE);
-fbAMInit(iNum := 9, iSeverity := AM_ERROR, iProcess := 1, iDelay := 600,
+fbAMInit(iNum := 9, iSeverity := c_AM_ERROR, iProcess := 1, iDelay := 600,
          xLock := FALSE, xLatch := FALSE, xBuzzer := FALSE);
-fbAMInit(iNum := 10, iSeverity := AM_ERROR, iProcess := 1, iDelay := 600,
+fbAMInit(iNum := 10, iSeverity := c_AM_ERROR, iProcess := 1, iDelay := 600,
          xLock := FALSE, xLatch := FALSE, xBuzzer := FALSE);
-fbAMInit(iNum := 11, iSeverity := AM_ERROR, iProcess := 1, iDelay := 600,
+fbAMInit(iNum := 11, iSeverity := c_AM_ERROR, iProcess := 1, iDelay := 600,
          xLock := FALSE, xLatch := FALSE, xBuzzer := FALSE);
-fbAMInit(iNum := 12, iSeverity := AM_ERROR, iProcess := 1, iDelay := 600,
+fbAMInit(iNum := 12, iSeverity := c_AM_ERROR, iProcess := 1, iDelay := 600,
          xLock := FALSE, xLatch := FALSE, xBuzzer := FALSE);
 
 (* 13–18: пускатель напорного не замкнулся — Error, 3 с, ЗАЩЁЛКА (iDelay 60 × 50 мс) *)
-fbAMInit(iNum := 13, iSeverity := AM_ERROR, iProcess := 1, iDelay := 60,
+fbAMInit(iNum := 13, iSeverity := c_AM_ERROR, iProcess := 1, iDelay := 60,
          xLock := FALSE, xLatch := TRUE, xBuzzer := FALSE);
-fbAMInit(iNum := 14, iSeverity := AM_ERROR, iProcess := 1, iDelay := 60,
+fbAMInit(iNum := 14, iSeverity := c_AM_ERROR, iProcess := 1, iDelay := 60,
          xLock := FALSE, xLatch := TRUE, xBuzzer := FALSE);
-fbAMInit(iNum := 15, iSeverity := AM_ERROR, iProcess := 1, iDelay := 60,
+fbAMInit(iNum := 15, iSeverity := c_AM_ERROR, iProcess := 1, iDelay := 60,
          xLock := FALSE, xLatch := TRUE, xBuzzer := FALSE);
-fbAMInit(iNum := 16, iSeverity := AM_ERROR, iProcess := 1, iDelay := 60,
+fbAMInit(iNum := 16, iSeverity := c_AM_ERROR, iProcess := 1, iDelay := 60,
          xLock := FALSE, xLatch := TRUE, xBuzzer := FALSE);
-fbAMInit(iNum := 17, iSeverity := AM_ERROR, iProcess := 1, iDelay := 60,
+fbAMInit(iNum := 17, iSeverity := c_AM_ERROR, iProcess := 1, iDelay := 60,
          xLock := FALSE, xLatch := TRUE, xBuzzer := FALSE);
-fbAMInit(iNum := 18, iSeverity := AM_ERROR, iProcess := 1, iDelay := 60,
+fbAMInit(iNum := 18, iSeverity := c_AM_ERROR, iProcess := 1, iDelay := 60,
          xLock := FALSE, xLatch := TRUE, xBuzzer := FALSE);
 
 (* 19–22: обрыв Pt100 щупы продукта 1–4 — Warning, 3 с (iDelay 60 × 50 мс) *)
-fbAMInit(iNum := 19, iSeverity := AM_WARNING, iProcess := 1, iDelay := 60,
+fbAMInit(iNum := 19, iSeverity := c_AM_WARNING, iProcess := 1, iDelay := 60,
          xLock := FALSE, xLatch := FALSE, xBuzzer := FALSE);
-fbAMInit(iNum := 20, iSeverity := AM_WARNING, iProcess := 1, iDelay := 60,
+fbAMInit(iNum := 20, iSeverity := c_AM_WARNING, iProcess := 1, iDelay := 60,
          xLock := FALSE, xLatch := FALSE, xBuzzer := FALSE);
-fbAMInit(iNum := 21, iSeverity := AM_WARNING, iProcess := 1, iDelay := 60,
+fbAMInit(iNum := 21, iSeverity := c_AM_WARNING, iProcess := 1, iDelay := 60,
          xLock := FALSE, xLatch := FALSE, xBuzzer := FALSE);
-fbAMInit(iNum := 22, iSeverity := AM_WARNING, iProcess := 1, iDelay := 60,
+fbAMInit(iNum := 22, iSeverity := c_AM_WARNING, iProcess := 1, iDelay := 60,
          xLock := FALSE, xLatch := FALSE, xBuzzer := FALSE);
 
 (* 23: обрыв датчика улицы (0-10 В) — Warning, 3 с (iDelay 60 × 50 мс) *)
-fbAMInit(iNum := 23, iSeverity := AM_WARNING, iProcess := 1, iDelay := 60,
+fbAMInit(iNum := 23, iSeverity := c_AM_WARNING, iProcess := 1, iDelay := 60,
          xLock := FALSE, xLatch := FALSE, xBuzzer := FALSE);
 
 (* 24–25: обрыв 4-20 мА ПВТ110 (t°, влажность) — Warning, 3 с (iDelay 60 × 50 мс) *)
-fbAMInit(iNum := 24, iSeverity := AM_WARNING, iProcess := 1, iDelay := 60,
+fbAMInit(iNum := 24, iSeverity := c_AM_WARNING, iProcess := 1, iDelay := 60,
          xLock := FALSE, xLatch := FALSE, xBuzzer := FALSE);
-fbAMInit(iNum := 25, iSeverity := AM_WARNING, iProcess := 1, iDelay := 60,
+fbAMInit(iNum := 25, iSeverity := c_AM_WARNING, iProcess := 1, iDelay := 60,
          xLock := FALSE, xLatch := FALSE, xBuzzer := FALSE);
 
 (* 26: температура продукта выше макс. — Error, 5 с (iDelay 100 × 50 мс) *)
-fbAMInit(iNum := 26, iSeverity := AM_ERROR, iProcess := 1, iDelay := 100,
+fbAMInit(iNum := 26, iSeverity := c_AM_ERROR, iProcess := 1, iDelay := 100,
          xLock := FALSE, xLatch := FALSE, xBuzzer := FALSE);
 
 (* 27: влажность ниже минимума — Error, 5 с (iDelay 100 × 50 мс) *)
-fbAMInit(iNum := 27, iSeverity := AM_ERROR, iProcess := 1, iDelay := 100,
+fbAMInit(iNum := 27, iSeverity := c_AM_ERROR, iProcess := 1, iDelay := 100,
          xLock := FALSE, xLatch := FALSE, xBuzzer := FALSE);
 
 

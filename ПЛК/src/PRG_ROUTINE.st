@@ -7,7 +7,7 @@
     1) слой аналоговых входов (код бывшего FB_IO): масштабирование
        7 каналов, коррекции, обрывы; выходы блоков масштабирования (INT, ×10)
        через функцию FLT10 → глобальные REAL-переменные AI_f* (для HMI-графиков);
-    2) тревоги AlarmManager V203 (код бывшего FB_ALARMS): AM_SET ×28,
+    2) тревоги AlarmManager V212 (код бывшего FB_ALARMS): FB_AM_SET ×28,
        сводные флаги, упаковка для HMI, сброс/автосброс;
     3) световая колонна: вызов ФБ FB_LIGHT (единственный оставшийся ФБ);
     4) Modbus slave (порт 2, RS-485): инициализация для диспетчеризации/PUSH
@@ -111,10 +111,10 @@ AI_fTProd4 := FLT10(fbScaleRtd.ValueOut);
 AI_fTProdAvg := (AI_fTProd1 + AI_fTProd2 + AI_fTProd3 + AI_fTProd4) / 4.0;
 
 (* ════════════════════════════════════════════════════════════════
-   ЧАСТЬ 2. ТРЕВОГИ ALARMMANAGER V203 (код бывшего FB_ALARMS)
+   ЧАСТЬ 2. ТРЕВОГИ ALARMMANAGER V212 (код бывшего FB_ALARMS)
    ════════════════════════════════════════════════════════════════
-   - регистрация условий 28 тревог (AM_SET) — нумерация 0–27, план §5;
-   - сводные флаги: g_xAnyAlarm (AM_HAS_ALARM), g_xAnyBlock (AM_IS_BLOCK);
+   - регистрация условий 28 тревог (FB_AM_SET) — нумерация 0–27, план §5;
+   - сводные флаги: g_xAnyAlarm (FB_AM_HAS_ALARMS), g_xAnyBlock (FB_AM_IS_BLOCK);
    - упаковка тревог для HMI: D550 (биты 0–15), D551 (биты 16–27);
    - сброс: ручной (кнопка HMI g_xAlarmResetHmi) и автосброс
      (g_xAutoReset = TRUE, через g_iAutoResetDelay минут).
@@ -184,14 +184,14 @@ fbAMHas(iProcessNum := 0, iSeverity := 0, Q := g_xAnyAlarm, AC := g_iAlarmCount)
 fbAMBlock(iProcessNum := 0, iSeverity := 0, Q := g_xAnyBlock);
 
 (* ── Упаковка тревог для HMI: D550 (0–15), D551 (16–27) ──────── *)
-fbAMPack(DNUM := 550, PD := AM_PACK_D);
+fbAMPack(DNUM := 550, PD := c_AM_PACK_D);
 
 (* ── Сброс тревог ────────────────────────────────────────────── *)
 (* Ручной сброс — кнопка HMI (фронт M523) *)
 xResetCmd := MEP(g_xAlarmResetHmi);
 
 (* Автосброс: включён (g_xAutoReset = TRUE), тревоги активны —
-   по истечении g_iAutoResetDelay минут выполняется AM_RESET.
+   по истечении g_iAutoResetDelay минут выполняется FB_AM_RESET.
    Ограничение HMI: g_iAutoResetDelay ≤ 500 мин (INT, счёт в секундах). *)
 IF MEP(g_xAnyAlarm AND g_xAutoReset) THEN
     xResetArmed := TRUE;
@@ -210,7 +210,7 @@ IF xResetArmed AND iAutoResetCount <= 0 THEN
     xResetArmed := FALSE;
 END_IF;
 
-(* AM_RESET удерживает сигнал сброса 1 с (см. AlarmManager V203) *)
+(* FB_AM_RESET удерживает сигнал сброса 1 с (см. AlarmManager V212) *)
 fbAMReset(IN := xResetCmd);
 
 (* ════════════════════════════════════════════════════════════════
