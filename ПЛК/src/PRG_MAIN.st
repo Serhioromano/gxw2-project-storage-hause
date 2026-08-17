@@ -164,7 +164,18 @@ CASE iState OF
     END_IF;
 
 200: (* ПОДГОТОВКА К АСПИРАЦИИ *)
-    IF AI_fTOutside <= FLT10(g_iToutHeat) THEN
+    g_xCmdHeatIn1 := FALSE;
+    g_xCmdHeatIn2 := FALSE;
+    g_xCmdHeatOut1 := FALSE;
+    g_xCmdHeatOut2 := FALSE;
+
+    (* Если температура outside не превышает порог аспирации 
+    не будет иначе заморозим продукт *)
+    IF AI_fTOutside <= FLT10(g_iToutAsper) THEN
+        iState := STATE_RESET;
+    (* Если температура снаруже меньше установленной 
+    сначала подогреем клапана перед открытием *)
+    ELSIF AI_fTOutside <= FLT10(g_iToutHeat) THEN
         g_xCmdHeatIn1 := TRUE;
         g_xCmdHeatIn2 := TRUE;
         g_xCmdHeatOut1 := TRUE;
@@ -175,18 +186,11 @@ CASE iState OF
     END_IF;
 
     IF g_xManualAspActive THEN
-        iAspTarget := g_iManualAspMin; (* ручная аспирация: мин. время *)
+        (* ручная аспирация: мин. время *)
+        iAspTarget := g_iManualAspMin; 
     ELSE
-        iAspTarget := astIntens[g_iIntensity].ASPER; (* регулярная аспирация: 5 мин *)
-    END_IF;
-
-    (* Если температура outside не превышает порог аспирации не будет иначе заморозим продукт *)
-    IF AI_fTOutside <= FLT10(g_iToutAsper) THEN
-        g_xCmdHeatIn1 := FALSE;
-        g_xCmdHeatIn2 := FALSE;
-        g_xCmdHeatOut1 := FALSE;
-        g_xCmdHeatOut2 := FALSE;
-        iState := STATE_RESET; 
+        (* регулярная аспирация: 5 мин *)
+        iAspTarget := astIntens[g_iIntensity].ASPER; 
     END_IF;
 
 210: (* ПОДОГРЕВ ЗАСЛОНОК *)
@@ -268,12 +272,12 @@ fbTOF8(IN := g_xCmdFanR2, PT := T#3s, Q := DO_FanR2);
 fbTOF9(IN := g_xCmdFanR3, PT := T#3s, Q := DO_FanR3);
 fbTOF10(IN := g_xCmdFanR4, PT := T#3s, Q := DO_FanR4);
 
-DO_FanH1 := DO_FanH1 AND NOT g_xAnyBlock;
-DO_FanH2 := DO_FanH2 AND NOT g_xAnyBlock;
-DO_FanH3 := DO_FanH3 AND NOT g_xAnyBlock;
-DO_FanH4 := DO_FanH4 AND NOT g_xAnyBlock;
-DO_FanH5 := DO_FanH5 AND NOT g_xAnyBlock;
-DO_FanH6 := DO_FanH6 AND NOT g_xAnyBlock;
+DO_FanH1 := DO_FanH1 AND NOT g_xAnyBlock AND NOT AM_ALARMS[13].Alarm;
+DO_FanH2 := DO_FanH2 AND NOT g_xAnyBlock AND NOT AM_ALARMS[14].Alarm;
+DO_FanH3 := DO_FanH3 AND NOT g_xAnyBlock AND NOT AM_ALARMS[15].Alarm;
+DO_FanH4 := DO_FanH4 AND NOT g_xAnyBlock AND NOT AM_ALARMS[16].Alarm;
+DO_FanH5 := DO_FanH5 AND NOT g_xAnyBlock AND NOT AM_ALARMS[17].Alarm;
+DO_FanH6 := DO_FanH6 AND NOT g_xAnyBlock AND NOT AM_ALARMS[18].Alarm;
 
 (* ── Клапаны (Belimo: питание = открыть, пружина = закрыть) ───── *)
 fbTOF11(IN := g_xCmdValveIn1, PT := T#3s, Q := DO_VlvIn1Open);
@@ -281,7 +285,7 @@ fbTOF12(IN := g_xCmdValveIn2, PT := T#3s, Q := DO_VlvIn2Open);
 fbTOF13(IN := g_xCmdValveOut1, PT := T#3s, Q := DO_VlvOut1Open);
 fbTOF14(IN := g_xCmdValveOut2, PT := T#3s, Q := DO_VlvOut2Open);
 fbTOF15(IN := g_xCmdValveRec1, PT := T#3s, Q := DO_VlvRec1Open);
-fbTOF16(IN := g_xCmdValveRec2, PT := T#3s, Q := DO_VlvRec2Open);    
+fbTOF16(IN := g_xCmdValveRec2, PT := T#3s, Q := DO_VlvRec2Open);
 
 (* ── Подогрев заслонок приток/сброс ──────────────────────────── *)
 DO_HeatVlvIn1 := g_xCmdHeatIn1;

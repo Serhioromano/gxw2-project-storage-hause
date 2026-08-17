@@ -23,7 +23,7 @@
   и работает в отдельной программе TimeControl (план §2).
 
   Локальные переменные — в PRG_ROUTINE.csv.
-*)
+ *)
 
 (* Разрешение прерываний (EI) — первая строка каждой программы *)
 EI(TRUE);
@@ -31,11 +31,11 @@ EI(TRUE);
 (* ════════════════════════════════════════════════════════════════
    ЧАСТЬ 1. СЛОЙ АНАЛОГОВЫХ ВХОДОВ (код бывшего FB_IO)
    ════════════════════════════════════════════════════════════════
-   - host AI0:  температура улицы, датчик 0-10 В (D8030), диапазон
+   - host AI0: температура улицы, датчик 0-10 В (D8030), диапазон
                 −50…+50 °C → °C×10, обрыв — по ErrWire (тревога 23);
-   - host AI2:  температура в камере, ПВТ110 4-20 мА (D8032),
+   - host AI2: температура в камере, ПВТ110 4-20 мА (D8032),
                 диапазон −40…+80 °C → °C×10;
-   - host AI3:  влажность в камере, ПВТ110 4-20 мА (D8033),
+   - host AI3: влажность в камере, ПВТ110 4-20 мА (D8033),
                 диапазон 5…95 % → %×10;
    - модуль L02-RTD: щупы продукта 1–4 (R23700–R23703) — готовые °C×10;
    - средняя температура продукта по 4 щупам.
@@ -70,11 +70,11 @@ EI(TRUE);
    Масштабированные значения пишутся в метки AI_f* (REAL, D0–D15),
    которые читают остальные блоки и HMI.
 
-   Именование: AI_f* — REAL (float), AI_i* — INT (сырые значения).
+   Именование: AI_f* — REAL (float), AI_i* — INT(сырые значения).
 
    Один экземпляр SCALE_AI используется для всех host-каналов,
    один экземпляр L02_SCALE_AI — для всех щупов (см. Utils V3).
-*)
+ *)
 
 (* Host AI0: температура улицы, датчик 0-10 В (−50…+50 °C → −500…+500 °C×10).
    Экземпляр fbScaleHost общий для 3 каналов — ErrWire и ValueOut читаем
@@ -82,17 +82,17 @@ EI(TRUE);
    Значение SCALE_AI (INT, ×10) через FLT10 → глобальная REAL (для HMI). *)
 fbScaleHost(AINum := 0, SType := STYPE_0_10V, Min := -500, Max := 500,
             Correction := g_iCorrTout, FilterTime := 10, FilterNum := 100);
-fbAMSet(iNum := 23, xState := fbScaleHost.ErrWire);  (* обрыв 0-10 В *)
+fbAMSet(iNum := 23, xState := fbScaleHost.ErrWire); (* обрыв 0-10 В *)
 AI_fTOutside := FLT10(fbScaleHost.ValueOut);
 
 (* Host AI2: температура в камере (ПВТ110, 4-20 мА, −40…+80 °C) *)
 fbScaleHost(AINum := 2, SType := STYPE_4_20MA, Min := -400, Max := 800);
-fbAMSet(iNum := 24, xState := fbScaleHost.ErrWire);  (* обрыв 4-20 мА, t камеры *)
+fbAMSet(iNum := 24, xState := fbScaleHost.ErrWire); (* обрыв 4-20 мА, t камеры *)
 AI_fTChamber := FLT10(fbScaleHost.ValueOut);
 
 (* Host AI3: влажность в камере (ПВТ110, 4-20 мА, 5…95 %) *)
 fbScaleHost(AINum := 3, SType := STYPE_4_20MA, Min := 50, Max := 950);
-fbAMSet(iNum := 25, xState := fbScaleHost.ErrWire);  (* обрыв 4-20 мА, влажность *)
+fbAMSet(iNum := 25, xState := fbScaleHost.ErrWire); (* обрыв 4-20 мА, влажность *)
 AI_fHChamber := FLT10(fbScaleHost.ValueOut);
 
 (* L02-RTD: щупы температуры продукта 1–4 (готовые °C×10,
@@ -131,23 +131,25 @@ AI_fTProdAvg := (AI_fTProd1 + AI_fTProd2 + AI_fTProd3 + AI_fTProd4) / 4.0;
    СРАЗУ после масштабирования в части 1 и здесь НЕ повторяются.
    Обрыв щупов Pt100 (19–22) — по значению ≤ −1900 (модуль L02-RTD
    контроля обрыва не имеет, см. план §4, п.5).
-*)
+ *)
 
 (* ── Регистрация условий тревог ───────────────────────────────── *)
 (* 0: реле контроля фаз — ошибка фазировки *)
 fbAMSet(iNum := 0, xState := DI_PhaseFault);
 
-(* 1–6: клапан не открылся (команда «открыть» есть, концевик не сработал) *)
-fbAMSet(iNum := 1, xState := DO_VlvIn1Open AND DI_VlvIn1Open);
-fbAMSet(iNum := 2, xState := DO_VlvIn2Open AND DI_VlvIn2Open);
-fbAMSet(iNum := 3, xState := DO_VlvOut1Open AND DI_VlvOut1Open);
-fbAMSet(iNum := 4, xState := DO_VlvOut2Open AND DI_VlvOut2Open);
-fbAMSet(iNum := 5, xState := DO_VlvRec1Open AND DI_VlvRec1Open);
-fbAMSet(iNum := 6, xState := DO_VlvRec2Open AND DI_VlvRec2Open);
+(* 1–6:клапан не открылся — командв «открыть» подана,
+   а концевик «открыт» (НО) не сработал. НО: DI_*Open = 1 — клапан открыт,
+   0 — закрыт.*)
+fbAMSet(iNum := 1, xState := DO_VlvIn1Open AND NOT DI_VlvIn1Open);
+fbAMSet(iNum := 2, xState := DO_VlvIn2Open AND NOT DI_VlvIn2Open);
+fbAMSet(iNum := 3, xState := DO_VlvOut1Open AND NOT DI_VlvOut1Open);
+fbAMSet(iNum := 4, xState := DO_VlvOut2Open AND NOT DI_VlvOut2Open);
+fbAMSet(iNum := 5, xState := DO_VlvRec1Open AND NOT DI_VlvRec1Open);
+fbAMSet(iNum := 6, xState := DO_VlvRec2Open AND NOT DI_VlvRec2Open);
 
 (* 28–33: клапан не закрылся — команды «открыть» нет (пружина закрывает),
    а концевик «закрыт» (НО) не сработал. НО: DI_*Close = 1 — клапан закрыт,
-   0 — не закрыт. Полярность уточнить при пусконаладке (см. вопросы §1.3). *)
+   0 — не закрыт.*)
 fbAMSet(iNum := 28, xState := NOT DO_VlvIn1Open AND NOT DI_VlvIn1Close);
 fbAMSet(iNum := 29, xState := NOT DO_VlvIn2Open AND NOT DI_VlvIn2Close);
 fbAMSet(iNum := 30, xState := NOT DO_VlvOut1Open AND NOT DI_VlvOut1Close);
@@ -156,9 +158,9 @@ fbAMSet(iNum := 32, xState := NOT DO_VlvRec1Open AND NOT DI_VlvRec1Close);
 fbAMSet(iNum := 33, xState := NOT DO_VlvRec2Open AND NOT DI_VlvRec2Close);
 
 (* 7–12: нет потока воздуха, напорные вентиляторы 1–6 *)
-fbAMSet(iNum := 7,  xState := DO_FanH1 AND DI_Flow1);
-fbAMSet(iNum := 8,  xState := DO_FanH2 AND DI_Flow2);
-fbAMSet(iNum := 9,  xState := DO_FanH3 AND DI_Flow3);
+fbAMSet(iNum := 7, xState := DO_FanH1 AND DI_Flow1);
+fbAMSet(iNum := 8, xState := DO_FanH2 AND DI_Flow2);
+fbAMSet(iNum := 9, xState := DO_FanH3 AND DI_Flow3);
 fbAMSet(iNum := 10, xState := DO_FanH4 AND DI_Flow4);
 fbAMSet(iNum := 11, xState := DO_FanH5 AND DI_Flow5);
 fbAMSet(iNum := 12, xState := DO_FanH6 AND DI_Flow6);
@@ -190,49 +192,25 @@ fbAMSet(iNum := 26, xState := (R23700 > g_iTprodMax) OR
    AI_fHChamber — REAL в натуральных единицах (FLT10 делит на 10),
    g_iHmin — INT в масштабе ×10 → порог переводится функцией FLT10
    (в GX Works 2 нет неявного REAL↔INT в сравнениях). *)
-fbAMSet(iNum := 27, xState := (AI_fHChamber < FLT10(g_iHmin)) AND
-                              (AI_iRawHChamber < 32720));
+fbAMSet(iNum := 27, xState := AI_fHChamber < FLT10(g_iHmin));
 
 (* ── Сводные флаги для логики и HMI ──────────────────────────── *)
 fbAMHas(iProcessNum := 0, iSeverity := 0, Q := g_xAnyAlarm, AC := g_iAlarmCount);
 fbAMBlock(iProcessNum := 0, iSeverity := 0, Q := g_xAnyBlock);
 
 (* ── Упаковка тревог для HMI: D550 (0–15), D551 (16–31), D552 (32–33) ── *)
-fbAMPack(DNUM := 550, PD := c_AM_PACK_D);
+fbAMPack(DNUM := 3000, PD := c_AM_PACK_M);
 
 (* ── Сброс тревог ────────────────────────────────────────────── *)
-(* Ручной сброс — кнопка HMI (фронт M523) *)
-xResetCmd := MEP(g_xAlarmResetHmi);
-
-(* Автосброс: включён (g_xAutoReset = TRUE), тревоги активны —
-   по истечении g_iAutoResetDelay минут выполняется FB_AM_RESET.
-   Ограничение HMI: g_iAutoResetDelay ≤ 500 мин (INT, счёт в секундах). *)
-IF MEP(g_xAnyAlarm AND g_xAutoReset) THEN
-    xResetArmed := TRUE;
-    iAutoResetCount := g_iAutoResetDelay * 60;
-END_IF;
-IF NOT g_xAnyAlarm THEN
-    xResetArmed := FALSE;
-END_IF;
-IF xResetArmed AND MEP(M8013) THEN
-    IF iAutoResetCount > 0 THEN
-        iAutoResetCount := iAutoResetCount - 1;
-    END_IF;
-END_IF;
-IF xResetArmed AND iAutoResetCount <= 0 THEN
-    xResetCmd := TRUE;
-    xResetArmed := FALSE;
-END_IF;
-
 (* FB_AM_RESET удерживает сигнал сброса 1 с (см. AlarmManager V212) *)
-fbAMReset(IN := xResetCmd);
+fbAMReset(IN := g_xAlarmResetHmi, AutoReset := g_iAutoResetDelay * 60);
 
 (* ════════════════════════════════════════════════════════════════
    ЧАСТЬ 3. СВЕТОВАЯ КОЛОННА (ФБ FB_LIGHT)
    ════════════════════════════════════════════════════════════════
    Выбор режима и индикация по плану §6.7. FB_LIGHT — единственный
    оставшийся в проекте функциональный блок (кроме библиотечных).
-*)
+ *)
 fbLight();
 
 (* ════════════════════════════════════════════════════════════════
@@ -253,6 +231,6 @@ fbLight();
 
    ⚠ Полярность: для включения Modbus slave порт 2 ПЛК должен быть
    настроен на RS-485 (аппаратно), адрес/скорость — выше.
-*)
+ *)
 PortSettings := MB_PORT_SETTINGS(MB_PARITY_NONE, MB_STOPBIT_1, MB_BPS_9600);
 xMbDummy := MB_SLAVE_INIT_PORT2(M8002 OR g_xMbApply, g_iMbAddr, PortSettings);
