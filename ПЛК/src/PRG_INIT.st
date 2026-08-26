@@ -42,7 +42,7 @@ IF g_iStartDelay = 0 THEN g_iStartDelay := 3; END_IF;    (* 3 с — пуск в
 IF g_iManualAspMin = 0 THEN g_iManualAspMin := 5; END_IF; (* 5 мин — ручн. аспирация *)
 (* g_xAutoReset: BOOL, заводское FALSE — не трогаем; выбор оператора
    (вкл/выкл) сохраняется между перезапусками. *)
-IF g_iAutoResetDelay = 0 THEN g_iAutoResetDelay := 60; END_IF; (* 60 мин — автосброс *)
+IF g_iAutoResetDelay = 0 THEN g_iAutoResetDelay := 120; END_IF; (* 60 мин — автосброс *)
 (* g_iTprodMax, g_iHmin: заводская уставка 0, задаётся оператором с HMI —
    не перезаписываем, иначе нельзя сохранить 0 (запрет тревог). *)
 (* Коррекция датчиков Pt100 (HMI, °C×10): заводская уставка 0 —
@@ -65,18 +65,18 @@ IF g_iMbAddr = 0 THEN g_iMbAddr := 1; END_IF;        (* адрес 1 *)
 fbAMInit(iNum := 0, iSeverity := c_AM_ERROR, iProcess := 1, iDelay := 0,
          xLock := TRUE, xLatch := FALSE, xBuzzer := FALSE);
 
-(* 1–6: клапан не открылся — Warning, 60 с (iDelay 1200 × 50 мс) *)
-fbAMInit(iNum := 1, iSeverity := c_AM_WARNING, iProcess := 1, iDelay := 1200,
+(* 1–6: клапан не открылся — Warning, 60 с (iDelay g_iValveTime (сек) / 20 = х50 мс) *)
+fbAMInit(iNum := 1, iSeverity := c_AM_WARNING, iProcess := 1, iDelay := g_iValveTime / 20,
          xLock := FALSE, xLatch := FALSE, xBuzzer := FALSE);
-fbAMInit(iNum := 2, iSeverity := c_AM_WARNING, iProcess := 1, iDelay := 1200,
+fbAMInit(iNum := 2, iSeverity := c_AM_WARNING, iProcess := 1, iDelay := g_iValveTime / 20,
          xLock := FALSE, xLatch := FALSE, xBuzzer := FALSE);
-fbAMInit(iNum := 3, iSeverity := c_AM_WARNING, iProcess := 1, iDelay := 1200,
+fbAMInit(iNum := 3, iSeverity := c_AM_WARNING, iProcess := 1, iDelay := g_iValveTime / 20,
          xLock := FALSE, xLatch := FALSE, xBuzzer := FALSE);
-fbAMInit(iNum := 4, iSeverity := c_AM_WARNING, iProcess := 1, iDelay := 1200,
+fbAMInit(iNum := 4, iSeverity := c_AM_WARNING, iProcess := 1, iDelay := g_iValveTime / 20,
          xLock := FALSE, xLatch := FALSE, xBuzzer := FALSE);
-fbAMInit(iNum := 5, iSeverity := c_AM_WARNING, iProcess := 1, iDelay := 1200,
+fbAMInit(iNum := 5, iSeverity := c_AM_WARNING, iProcess := 1, iDelay := g_iValveTime / 20,
          xLock := FALSE, xLatch := FALSE, xBuzzer := FALSE);
-fbAMInit(iNum := 6, iSeverity := c_AM_WARNING, iProcess := 1, iDelay := 1200,
+fbAMInit(iNum := 6, iSeverity := c_AM_WARNING, iProcess := 1, iDelay := g_iValveTime / 20,
          xLock := FALSE, xLatch := FALSE, xBuzzer := FALSE);
 
 (* 7–12: нет потока воздуха, напорный вентилятор — Error, 30 с (iDelay 600 × 50 мс) *)
@@ -135,18 +135,18 @@ fbAMInit(iNum := 26, iSeverity := c_AM_ERROR, iProcess := 1, iDelay := 100,
 fbAMInit(iNum := 27, iSeverity := c_AM_ERROR, iProcess := 1, iDelay := 100,
          xLock := FALSE, xLatch := FALSE, xBuzzer := FALSE);
 
-(* 28–33: клапан не закрылся — Warning, 60 с (iDelay 1200 × 50 мс) *)
-fbAMInit(iNum := 28, iSeverity := c_AM_WARNING, iProcess := 1, iDelay := 1200,
+(* 28–33: клапан не закрылся — Warning, 60 с (iDelay g_iValveTime / 20 × 50 мс) *)
+fbAMInit(iNum := 28, iSeverity := c_AM_WARNING, iProcess := 1, iDelay := g_iValveTime / 20,
          xLock := FALSE, xLatch := FALSE, xBuzzer := FALSE);
-fbAMInit(iNum := 29, iSeverity := c_AM_WARNING, iProcess := 1, iDelay := 1200,
+fbAMInit(iNum := 29, iSeverity := c_AM_WARNING, iProcess := 1, iDelay := g_iValveTime / 20,
          xLock := FALSE, xLatch := FALSE, xBuzzer := FALSE);
-fbAMInit(iNum := 30, iSeverity := c_AM_WARNING, iProcess := 1, iDelay := 1200,
+fbAMInit(iNum := 30, iSeverity := c_AM_WARNING, iProcess := 1, iDelay := g_iValveTime / 20,
          xLock := FALSE, xLatch := FALSE, xBuzzer := FALSE);
-fbAMInit(iNum := 31, iSeverity := c_AM_WARNING, iProcess := 1, iDelay := 1200,
+fbAMInit(iNum := 31, iSeverity := c_AM_WARNING, iProcess := 1, iDelay := g_iValveTime / 20,
          xLock := FALSE, xLatch := FALSE, xBuzzer := FALSE);
-fbAMInit(iNum := 32, iSeverity := c_AM_WARNING, iProcess := 1, iDelay := 1200,
+fbAMInit(iNum := 32, iSeverity := c_AM_WARNING, iProcess := 1, iDelay := g_iValveTime / 20,
          xLock := FALSE, xLatch := FALSE, xBuzzer := FALSE);
-fbAMInit(iNum := 33, iSeverity := c_AM_WARNING, iProcess := 1, iDelay := 1200,
+fbAMInit(iNum := 33, iSeverity := c_AM_WARNING, iProcess := 1, iDelay := g_iValveTime / 20,
          xLock := FALSE, xLatch := FALSE, xBuzzer := FALSE);
 
 
