@@ -37,7 +37,7 @@ D8058 := 2#0000_0000_0000_1100;
 IF g_iIntensity = 0 THEN g_iIntensity := 1; END_IF;   (* 600 мин рециркуляции *)
 IF g_iToutAsper = 0 THEN g_iToutAsper := 30; END_IF;  (* 3.0 °C — мин. t улицы для аспирации *)
 IF g_iToutHeat = 0 THEN g_iToutHeat := 50; END_IF;   (* 5.0 °C — мин. t улицы для подогрева заслонок *)
-IF g_iPreheatTime = 0 THEN g_iPreheatTime := 180; END_IF; (* 180 с — предподогрев *)
+IF g_iPreheatTime = 0 THEN g_iPreheatTime := 3; END_IF;   (* 3 мин — предподогрев *)
 IF g_iManualAspMin = 0 THEN g_iManualAspMin := 5; END_IF; (* 5 мин — ручн. аспирация *)
 (* g_xAutoReset: BOOL, заводское FALSE — не трогаем; выбор оператора
    (вкл/выкл) сохраняется между перезапусками. *)

@@ -251,7 +251,7 @@ g_iStep := iState;
 
    Длительности фаз:
    - рециркуляция: astIntens[g_iIntensity].RECIRC (мин);
-   - прогрев:      g_iPreheatTime (счётчик g_iPreheatLeft);
+   - прогрев:      g_iPreheatTime, мин (счётчик g_iPreheatLeft);
    - аспирация:    astIntens[g_iIntensity].ASPER (мин, регулярная) либо
                    g_iManualAspMin (ручная) — уже в локальном iAspTarget.
 
