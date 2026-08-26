@@ -42,11 +42,11 @@ EI(TRUE);
 
   Логика по плану §6.4:
   - рециркуляция: длительность по интенсивности (1200/600/300 мин),
-    клапаны рециркуляции открыты, Y00 = 0; вентиляторы следуют за X20
+    клапаны рециркуляции открыты, Y00 = 0; вентиляторы следуют за X03
     (охладитель) — реализовано ниже, в части «Приводы»;
-  - перед аспирацией проверка t улицы: g_iToutMin ≤ t ≤ g_iToutMax,
-    иначе пропуск цикла; при t улицы < g_iTpreheat — подогрев заслонок;
-  - пауза g_iStartDelay (30 с), затем аспирация 5 мин (300 с);
+  - перед аспирацией проверка t улицы: при t ≤ g_iToutAsper — пропуск
+    цикла (слишком холодно); при t ≤ g_iToutHeat — подогрев заслонок;
+  - аспирация 5 мин (300 с, регулярная) или g_iManualAspMin (ручная);
   - Y00 = 1 только во время аспирации (запрет охлаждения).
 
   Ручная аспирация (HMI: g_xManualAspCmd + g_iManualAspMin):
@@ -110,8 +110,7 @@ CASE iState OF
     g_xCmdValveIn1 := FALSE; g_xCmdValveIn2 := FALSE;
     g_xCmdValveOut1 := FALSE; g_xCmdValveOut2 := FALSE;
     g_xCmdValveRec1 := FALSE; g_xCmdValveRec2 := FALSE;
-    g_xCmdHeatIn1 := FALSE; g_xCmdHeatIn2 := FALSE;
-    g_xCmdHeatOut1 := FALSE; g_xCmdHeatOut2 := FALSE;
+    g_xCmdHeat := FALSE;
     g_xCmdCoolerStop := FALSE;
     g_xManualAspActive := FALSE;
 
@@ -136,8 +135,7 @@ CASE iState OF
         g_xCmdValveIn1 := FALSE; g_xCmdValveIn2 := FALSE;
         g_xCmdValveOut1 := FALSE; g_xCmdValveOut2 := FALSE;
         g_xCmdValveRec1 := FALSE; g_xCmdValveRec2 := FALSE;
-        g_xCmdHeatIn1 := FALSE; g_xCmdHeatIn2 := FALSE;
-        g_xCmdHeatOut1 := FALSE; g_xCmdHeatOut2 := FALSE;
+        g_xCmdHeat := FALSE;
         g_xCmdCoolerStop := FALSE;
         g_xManualAspActive := FALSE;
     END_IF;
@@ -180,10 +178,7 @@ CASE iState OF
 
 200: (* ПОДГОТОВКА К АСПИРАЦИИ *)
     IF AI_fTOutside <= FLT10(g_iToutHeat) THEN
-        g_xCmdHeatIn1 := TRUE;
-        g_xCmdHeatIn2 := TRUE;
-        g_xCmdHeatOut1 := TRUE;
-        g_xCmdHeatOut2 := TRUE;
+        g_xCmdHeat := TRUE;
         iState := STATE_PREHEAT; (* Подогрев *)
     ELSE
         iState := STATE_ASPER; (* Аспирация *)
@@ -197,10 +192,7 @@ CASE iState OF
 
     (* Если температура outside не превышает порог аспирации не будет иначе заморозим продукт *)
     IF AI_fTOutside <= FLT10(g_iToutAsper) THEN
-        g_xCmdHeatIn1 := FALSE;
-        g_xCmdHeatIn2 := FALSE;
-        g_xCmdHeatOut1 := FALSE;
-        g_xCmdHeatOut2 := FALSE;
+        g_xCmdHeat := FALSE;
         iState := STATE_RESET;
     END_IF;
 
@@ -210,8 +202,7 @@ CASE iState OF
         g_iPreheatLeft := 0; (* сброс счётчика подогрева *)
 
         (* Подогрев выключен *)
-        g_xCmdHeatIn1 := FALSE; g_xCmdHeatIn2 := FALSE;
-        g_xCmdHeatOut1 := FALSE; g_xCmdHeatOut2 := FALSE;
+        g_xCmdHeat := FALSE;
 
         (* Холод остановлен *)
         g_xCmdCoolerStop := TRUE;
@@ -263,7 +254,7 @@ g_iStep := iState;
 
    Особенности:
    - в режиме «Рециркуляция» (g_iModeDisp = 1) все вентиляторы следуют
-     за охладителем X20 (ТЗ §7.3.1);
+     за охладителем X03 (ТЗ §7.3.1);
    - блокирующая тревога «реле фаз» (g_xAnyBlock) снимает команды
      ТОЛЬКО напорных вентиляторов (380 В); разгонные (220 В, 1-фазн.)
      РКФ не блокирует (ТЗ §7.6, v1.2);
@@ -319,10 +310,7 @@ fbTOF15(IN := g_xCmdValveRec1, PT := T#3s, Q := DO_VlvRec1Open);
 fbTOF16(IN := g_xCmdValveRec2, PT := T#3s, Q := DO_VlvRec2Open);
 
 (* ── Подогрев заслонок приток/сброс ──────────────────────────── *)
-DO_HeatVlvIn1 := g_xCmdHeatIn1;
-DO_HeatVlvIn2 := g_xCmdHeatIn2;
-DO_HeatVlvOut1 := g_xCmdHeatOut1;
-DO_HeatVlvOut2 := g_xCmdHeatOut2;
+DO_HeatVlv := g_xCmdHeat;
 
 (* ── Блокировка охладителя: 1 = запрет, 0 = разрешение ───────── *)
 DO_CoolerStop := g_xCmdCoolerStop;
