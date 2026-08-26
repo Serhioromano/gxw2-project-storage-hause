@@ -76,6 +76,10 @@ EI(TRUE);
    один экземпляр L02_SCALE_AI — для всех щупов (см. Utils V3).
  *)
 
+
+g_xCoolerWorks := DI_CoolerRun;
+g_xIsAuto := DI_ModeAuto;
+
 (* Host AI0: температура улицы, датчик 0-10 В (−50…+50 °C → −500…+500 °C×10).
    Экземпляр fbScaleHost общий для 3 каналов — ErrWire и ValueOut читаем
    СРАЗУ после вызова (следующий вызов их перезапишет).
