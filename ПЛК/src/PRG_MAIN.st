@@ -127,6 +127,21 @@ CASE iState OF
         iState := STATE_PURGE;
     END_IF;
 
+    IF iState <> STATE_IDLE THEN
+        g_xCmdFanH1 := FALSE; g_xCmdFanH2 := FALSE;
+        g_xCmdFanH3 := FALSE; g_xCmdFanH4 := FALSE;
+        g_xCmdFanH5 := FALSE; g_xCmdFanH6 := FALSE;
+        g_xCmdFanR1 := FALSE; g_xCmdFanR2 := FALSE;
+        g_xCmdFanR3 := FALSE; g_xCmdFanR4 := FALSE;
+        g_xCmdValveIn1 := FALSE; g_xCmdValveIn2 := FALSE;
+        g_xCmdValveOut1 := FALSE; g_xCmdValveOut2 := FALSE;
+        g_xCmdValveRec1 := FALSE; g_xCmdValveRec2 := FALSE;
+        g_xCmdHeatIn1 := FALSE; g_xCmdHeatIn2 := FALSE;
+        g_xCmdHeatOut1 := FALSE; g_xCmdHeatOut2 := FALSE;
+        g_xCmdCoolerStop := FALSE;
+        g_xManualAspActive := FALSE;
+    END_IF;
+
 50: (* ПРОДУВКА: рециркуляция открыта, вентиляторы — вручную *)
     (* Команды режима: Выключено → через сброс в ОЖИДАНИЕ, Авто → 100 *)
     g_xCmdFanH1 := TRUE; g_xCmdFanH2 := TRUE;
