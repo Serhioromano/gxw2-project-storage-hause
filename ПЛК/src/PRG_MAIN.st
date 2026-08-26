@@ -164,18 +164,7 @@ CASE iState OF
     END_IF;
 
 200: (* ПОДГОТОВКА К АСПИРАЦИИ *)
-    g_xCmdHeatIn1 := FALSE;
-    g_xCmdHeatIn2 := FALSE;
-    g_xCmdHeatOut1 := FALSE;
-    g_xCmdHeatOut2 := FALSE;
-
-    (* Если температура outside не превышает порог аспирации 
-    не будет иначе заморозим продукт *)
-    IF AI_fTOutside <= FLT10(g_iToutAsper) THEN
-        iState := STATE_RESET;
-    (* Если температура снаруже меньше установленной 
-    сначала подогреем клапана перед открытием *)
-    ELSIF AI_fTOutside <= FLT10(g_iToutHeat) THEN
+    IF AI_fTOutside <= FLT10(g_iToutHeat) THEN
         g_xCmdHeatIn1 := TRUE;
         g_xCmdHeatIn2 := TRUE;
         g_xCmdHeatOut1 := TRUE;
@@ -186,11 +175,18 @@ CASE iState OF
     END_IF;
 
     IF g_xManualAspActive THEN
-        (* ручная аспирация: мин. время *)
-        iAspTarget := g_iManualAspMin; 
+        iAspTarget := g_iManualAspMin; (* ручная аспирация: мин. время *)
     ELSE
-        (* регулярная аспирация: 5 мин *)
-        iAspTarget := astIntens[g_iIntensity].ASPER; 
+        iAspTarget := astIntens[g_iIntensity].ASPER; (* регулярная аспирация: 5 мин *)
+    END_IF;
+
+    (* Если температура outside не превышает порог аспирации не будет иначе заморозим продукт *)
+    IF AI_fTOutside <= FLT10(g_iToutAsper) THEN
+        g_xCmdHeatIn1 := FALSE;
+        g_xCmdHeatIn2 := FALSE;
+        g_xCmdHeatOut1 := FALSE;
+        g_xCmdHeatOut2 := FALSE;
+        iState := STATE_RESET;
     END_IF;
 
 210: (* ПОДОГРЕВ ЗАСЛОНОК *)
@@ -260,24 +256,44 @@ g_iStep := iState;
      автомата в этом режиме равны FALSE (см. выше, состояние ПРОДУВКА).
  *)
 
-(* ── Вентиляторы: команда автомата; при РКФ блок только напорных ─ *)
-fbTOF1(IN := g_xCmdFanH1, PT := T#3s, Q := DO_FanH1);
-fbTOF2(IN := g_xCmdFanH2, PT := T#3s, Q := DO_FanH2);
-fbTOF3(IN := g_xCmdFanH3, PT := T#3s, Q := DO_FanH3);
-fbTOF4(IN := g_xCmdFanH4, PT := T#3s, Q := DO_FanH4);
-fbTOF5(IN := g_xCmdFanH5, PT := T#3s, Q := DO_FanH5);
-fbTOF6(IN := g_xCmdFanH6, PT := T#3s, Q := DO_FanH6);
-fbTOF7(IN := g_xCmdFanR1, PT := T#3s, Q := DO_FanR1);
-fbTOF8(IN := g_xCmdFanR2, PT := T#3s, Q := DO_FanR2);
-fbTOF9(IN := g_xCmdFanR3, PT := T#3s, Q := DO_FanR3);
-fbTOF10(IN := g_xCmdFanR4, PT := T#3s, Q := DO_FanR4);
+(* ── Вентиляторы: каскадный пуск с интервалом 2 с ─────────────── *)
+(* У каждого вентилятора СВОЙ таймер задержки включения (TON),
+   отсчитываемый от фронта его собственной команды: FanH1 — 2 с,
+   FanH2 — 4 с, ... FanR4 — 20 с. Так каскад работает одинаково и в
+   Авто (все команды приходят разом), и в ручном режиме (вентиляторы
+   включают по одному — каждый ждёт свою ступень, а не включается
+   мгновенно). Выключение — сразу у всех; TOF держит выход ещё 3 с. *)
+g_xModeManual := NOT DI_ModeAuto AND NOT DI_ModePurge; (* для HMI: ручной режим вентиляторов *)
 
-DO_FanH1 := DO_FanH1 AND NOT g_xAnyBlock AND NOT AM_ALARMS[13].Alarm;
-DO_FanH2 := DO_FanH2 AND NOT g_xAnyBlock AND NOT AM_ALARMS[14].Alarm;
-DO_FanH3 := DO_FanH3 AND NOT g_xAnyBlock AND NOT AM_ALARMS[15].Alarm;
-DO_FanH4 := DO_FanH4 AND NOT g_xAnyBlock AND NOT AM_ALARMS[16].Alarm;
-DO_FanH5 := DO_FanH5 AND NOT g_xAnyBlock AND NOT AM_ALARMS[17].Alarm;
-DO_FanH6 := DO_FanH6 AND NOT g_xAnyBlock AND NOT AM_ALARMS[18].Alarm;
+fbTON1(IN := g_xCmdFanH1 AND NOT g_xModeManual, PT := T#2s);
+fbTON2(IN := g_xCmdFanH2 AND NOT g_xModeManual, PT := T#4s);
+fbTON3(IN := g_xCmdFanH3 AND NOT g_xModeManual, PT := T#6s);
+fbTON4(IN := g_xCmdFanH4 AND NOT g_xModeManual, PT := T#8s);
+fbTON5(IN := g_xCmdFanH5 AND NOT g_xModeManual, PT := T#10s);
+fbTON6(IN := g_xCmdFanH6 AND NOT g_xModeManual, PT := T#12s);
+fbTON7(IN := g_xCmdFanR1 AND NOT g_xModeManual, PT := T#14s);
+fbTON8(IN := g_xCmdFanR2 AND NOT g_xModeManual, PT := T#16s);
+fbTON9(IN := g_xCmdFanR3 AND NOT g_xModeManual, PT := T#18s);
+fbTON10(IN := g_xCmdFanR4 AND NOT g_xModeManual, PT := T#20s);
+
+
+fbTOF1(IN := fbTON1.Q OR (g_xCmdFanH1 AND g_xModeManual), PT := T#3s, Q := DO_FanH1);
+fbTOF2(IN := fbTON2.Q OR (g_xCmdFanH2 AND g_xModeManual), PT := T#3s, Q := DO_FanH2);
+fbTOF3(IN := fbTON3.Q OR (g_xCmdFanH3 AND g_xModeManual), PT := T#3s, Q := DO_FanH3);
+fbTOF4(IN := fbTON4.Q OR (g_xCmdFanH4 AND g_xModeManual), PT := T#3s, Q := DO_FanH4);
+fbTOF5(IN := fbTON5.Q OR (g_xCmdFanH5 AND g_xModeManual), PT := T#3s, Q := DO_FanH5);
+fbTOF6(IN := fbTON6.Q OR (g_xCmdFanH6 AND g_xModeManual), PT := T#3s, Q := DO_FanH6);
+fbTOF7(IN := fbTON7.Q OR (g_xCmdFanR1 AND g_xModeManual), PT := T#3s, Q := DO_FanR1);
+fbTOF8(IN := fbTON8.Q OR (g_xCmdFanR2 AND g_xModeManual), PT := T#3s, Q := DO_FanR2);
+fbTOF9(IN := fbTON9.Q OR (g_xCmdFanR3 AND g_xModeManual), PT := T#3s, Q := DO_FanR3);
+fbTOF10(IN := fbTON10.Q OR (g_xCmdFanR4 AND g_xModeManual), PT := T#3s, Q := DO_FanR4);
+
+DO_FanH1 := DO_FanH1 AND NOT g_xAnyBlock;
+DO_FanH2 := DO_FanH2 AND NOT g_xAnyBlock;
+DO_FanH3 := DO_FanH3 AND NOT g_xAnyBlock;
+DO_FanH4 := DO_FanH4 AND NOT g_xAnyBlock;
+DO_FanH5 := DO_FanH5 AND NOT g_xAnyBlock;
+DO_FanH6 := DO_FanH6 AND NOT g_xAnyBlock;
 
 (* ── Клапаны (Belimo: питание = открыть, пружина = закрыть) ───── *)
 fbTOF11(IN := g_xCmdValveIn1, PT := T#3s, Q := DO_VlvIn1Open);
