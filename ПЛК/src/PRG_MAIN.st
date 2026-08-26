@@ -65,9 +65,10 @@ EI(TRUE);
  *)
 g_iModeCoarse := SEL(DI_ModePurge, SEL(DI_ModeAuto, 0, 1), 2);
 
-(* для HMI: 0=Выкл, 1=Рециркуляция, 2=Продувка, 3=Аспирация *)
+(* для HMI: 0=Выкл, 1=Рециркуляция, 2=Продувка, 3=Аспирация, 4=Прогрев клапанов *)
 g_iModeDisp := g_iModeCoarse;
-MOV(iState >= 200, 3, g_iModeDisp); (* Аспирация *)
+MOV(iState >= 200, 3, g_iModeDisp); (* Аспирация: 200 подготовка, 300 аспирация *)
+MOV(iState = 210, 4, g_iModeDisp);  (* Прогрев клапанов *)
 
 (* Если выключили во время аспирации *)
 MOV(g_iModeCoarse = 0 AND iState >= 200, STATE_RESET, iState);
@@ -242,6 +243,55 @@ END_CASE;
 
 (* Номер состояния автомата — для отладки и HMI *)
 g_iStep := iState;
+
+(* ════════════════════════════════════════════════════════════════
+   ЧАСТЬ 1.5. ПРОГРЕСС И ОСТАВШЕЕСЯ ВРЕМЯ (для HMI)
+   g_iProgress — 0..100 % выполнения текущей фазы (рециркуляция/прогрев/аспирация);
+   g_iLeftTime — сколько минут осталось до конца текущей фазы.
+
+   Длительности фаз:
+   - рециркуляция: astIntens[g_iIntensity].RECIRC (мин);
+   - прогрев:      g_iPreheatTime (счётчик g_iPreheatLeft);
+   - аспирация:    astIntens[g_iIntensity].ASPER (мин, регулярная) либо
+                   g_iManualAspMin (ручная) — уже в локальном iAspTarget.
+
+   Счётчики g_iRecircLeft / g_iPreheatLeft / g_iAspLeft считают ВВЕРХ
+   (INCP по тику M8014, 1 мин), поэтому «осталось» = длительность − счётчик,
+   «прогресс» = счётчик ÷ длительность × 100 %. В прочих состояниях
+   (Выкл, Продувка, подготовка) — 0 % и 0 мин.
+   ════════════════════════════════════════════════════════════════ *)
+CASE iState OF
+    100: (* РЕЦИРКУЛЯЦИЯ *)
+        IF astIntens[g_iIntensity].RECIRC > 0 THEN
+            g_iProgress := REAL_TO_INT(INT_TO_REAL(g_iRecircLeft) * 100.0
+                                       / INT_TO_REAL(astIntens[g_iIntensity].RECIRC));
+            g_iLeftTime := astIntens[g_iIntensity].RECIRC - g_iRecircLeft;
+        ELSE
+            g_iProgress := 0;
+            g_iLeftTime := 0;
+        END_IF;
+    210: (* ПРОГРЕВ КЛАПАНОВ *)
+        IF g_iPreheatTime > 0 THEN
+            g_iProgress := REAL_TO_INT(INT_TO_REAL(g_iPreheatLeft) * 100.0
+                                       / INT_TO_REAL(g_iPreheatTime));
+            g_iLeftTime := g_iPreheatTime - g_iPreheatLeft;
+        ELSE
+            g_iProgress := 0;
+            g_iLeftTime := 0;
+        END_IF;
+    300: (* АСПИРАЦИЯ *)
+        IF iAspTarget > 0 THEN
+            g_iProgress := REAL_TO_INT(INT_TO_REAL(g_iAspLeft) * 100.0
+                                       / INT_TO_REAL(iAspTarget));
+            g_iLeftTime := iAspTarget - g_iAspLeft;
+        ELSE
+            g_iProgress := 0;
+            g_iLeftTime := 0;
+        END_IF;
+    ELSE
+        g_iProgress := 0;
+        g_iLeftTime := 0;
+END_CASE;
 
 (* ════════════════════════════════════════════════════════════════
    ЧАСТЬ 2. ПРИВОДЫ (код бывшего FB_ACTUATORS)
