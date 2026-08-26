@@ -218,27 +218,27 @@ fbLight();
 0=выкл, 1=вкл, 2=тревога *)
 g_iFun1State := 0;
 MOV(DO_FanH1, 1, g_iFun1State);
-MOV(AM_ALARMS[13].Alarm, 1, g_iFun1State);
+MOV(AM_ALARMS[13].Alarm, 2, g_iFun1State);
 
 g_iFun2State := 0;
 MOV(DO_FanH2, 1, g_iFun2State);
-MOV(AM_ALARMS[14].Alarm, 1, g_iFun2State);
+MOV(AM_ALARMS[14].Alarm, 2, g_iFun2State);
 
 g_iFun3State := 0;
 MOV(DO_FanH3, 1, g_iFun3State);
-MOV(AM_ALARMS[15].Alarm, 1, g_iFun3State);
+MOV(AM_ALARMS[15].Alarm, 2, g_iFun3State);
 
 g_iFun4State := 0;
 MOV(DO_FanH4, 1, g_iFun4State);
-MOV(AM_ALARMS[16].Alarm, 1, g_iFun4State);
+MOV(AM_ALARMS[16].Alarm, 2, g_iFun4State);
 
 g_iFun5State := 0;
 MOV(DO_FanH5, 1, g_iFun5State);
-MOV(AM_ALARMS[17].Alarm, 1, g_iFun5State);
+MOV(AM_ALARMS[17].Alarm, 2, g_iFun5State);
 
 g_iFun6State := 0;
 MOV(DO_FanH6, 1, g_iFun6State);
-MOV(AM_ALARMS[18].Alarm, 1, g_iFun6State);
+MOV(AM_ALARMS[18].Alarm, 2, g_iFun6State);
 
 g_iFun7State := 0;
 MOV(DO_FanR1, 1, g_iFun7State);
