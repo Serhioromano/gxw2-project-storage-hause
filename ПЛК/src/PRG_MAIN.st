@@ -69,6 +69,7 @@ g_iModeCoarse := SEL(DI_ModePurge, SEL(DI_ModeAuto, 0, 1), 2);
 g_iModeDisp := g_iModeCoarse;
 MOV(iState >= 200, 3, g_iModeDisp); (* Аспирация: 200 подготовка, 300 аспирация *)
 MOV(iState = 210, 4, g_iModeDisp); (* Прогрев клапанов *)
+MOV(iState >= 200 AND g_xManualAspActive, 5, g_iModeDisp); (* Асперация в ручном режиме *)
 
 (* Если выключили во время аспирации *)
 MOV(g_iModeCoarse = 0 AND iState >= 200, STATE_RESET, iState);
@@ -84,7 +85,6 @@ IF MEP(g_xManualAspCmd) THEN
         iState := STATE_PREPARE; (* подготовка к аспирации *)
     ELSE
         g_xManualAspCmd := FALSE; (* игнор команды, если уже в аспирации *)
-        iState := STATE_PREPARE; (* подготовка к аспирации *)
     END_IF;
 END_IF;
 
@@ -117,6 +117,7 @@ CASE iState OF
     g_xValveIn := FALSE; g_xValveOut := FALSE; g_xValveRecycle := FALSE;
 
     g_iPreheatLeft := 0; g_iAspLeft := 0; g_iRecircLeft := 0;
+    g_xManualAspCmd := FALSE; (* сброс фронта ручной аспирации *)
 
     iState := STATE_IDLE; (* безусловный переход в ОЖИДАНИЕ *)
 
@@ -373,12 +374,12 @@ DO_FanR2 := SEL(g_xModeManual AND (iState = STATE_IDLE), fbTOF8.Q, g_xCmdFanR2);
 DO_FanR3 := SEL(g_xModeManual AND (iState = STATE_IDLE), fbTOF9.Q, g_xCmdFanR3);
 DO_FanR4 := SEL(g_xModeManual AND (iState = STATE_IDLE), fbTOF10.Q, g_xCmdFanR4);
 
-DO_FanH1 := DO_FanH1 AND NOT g_xAnyBlock;
-DO_FanH2 := DO_FanH2 AND NOT g_xAnyBlock;
-DO_FanH3 := DO_FanH3 AND NOT g_xAnyBlock;
-DO_FanH4 := DO_FanH4 AND NOT g_xAnyBlock;
-DO_FanH5 := DO_FanH5 AND NOT g_xAnyBlock;
-DO_FanH6 := DO_FanH6 AND NOT g_xAnyBlock;
+DO_FanH1 := DO_FanH1 AND NOT g_xAnyBlock AND g_iFun1State < 2;
+DO_FanH2 := DO_FanH2 AND NOT g_xAnyBlock AND g_iFun2State < 2;
+DO_FanH3 := DO_FanH3 AND NOT g_xAnyBlock AND g_iFun3State < 2;
+DO_FanH4 := DO_FanH4 AND NOT g_xAnyBlock AND g_iFun4State < 2;
+DO_FanH5 := DO_FanH5 AND NOT g_xAnyBlock AND g_iFun5State < 2;
+DO_FanH6 := DO_FanH6 AND NOT g_xAnyBlock AND g_iFun6State < 2;
 
 (* ── Клапаны (Belimo: питание = открыть, пружина = закрыть) ───── *)
 fbTOF11(IN := g_xCmdValveIn1, PT := T#3s);
