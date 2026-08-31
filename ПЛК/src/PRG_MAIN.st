@@ -68,7 +68,7 @@ g_iModeCoarse := SEL(DI_ModePurge, SEL(DI_ModeAuto, 0, 1), 2);
 (* для HMI: 0=Выкл, 1=Рециркуляция, 2=Продувка, 3=Аспирация, 4=Прогрев клапанов *)
 g_iModeDisp := g_iModeCoarse;
 MOV(iState >= 200, 3, g_iModeDisp); (* Аспирация: 200 подготовка, 300 аспирация *)
-MOV(iState = 210, 4, g_iModeDisp);  (* Прогрев клапанов *)
+MOV(iState = 210, 4, g_iModeDisp); (* Прогрев клапанов *)
 
 (* Если выключили во время аспирации *)
 MOV(g_iModeCoarse = 0 AND iState >= 200, STATE_RESET, iState);
@@ -114,6 +114,7 @@ CASE iState OF
     g_xCmdHeat := FALSE;
     g_xCmdCoolerStop := FALSE;
     g_xManualAspActive := FALSE;
+    g_xValveIn := FALSE; g_xValveOut := FALSE; g_xValveRecycle := FALSE;
 
     g_iPreheatLeft := 0; g_iAspLeft := 0; g_iRecircLeft := 0;
 
@@ -139,6 +140,7 @@ CASE iState OF
         g_xCmdHeat := FALSE;
         g_xCmdCoolerStop := FALSE;
         g_xManualAspActive := FALSE;
+        g_xValveIn := FALSE; g_xValveOut := FALSE; g_xValveRecycle := FALSE;
     END_IF;
 
 50: (* ПРОДУВКА: рециркуляция открыта, вентиляторы — вручную *)
@@ -178,7 +180,7 @@ CASE iState OF
     END_IF;
 
 200: (* ПОДГОТОВКА К АСПИРАЦИИ *)
-    IF AI_fTOutside <= FLT10(g_iToutHeat) THEN
+    IF AI_fTOutside <= F_FLT10(g_iToutHeat) THEN
         g_xCmdHeat := TRUE;
         iState := STATE_PREHEAT; (* Подогрев *)
     ELSE
@@ -192,7 +194,7 @@ CASE iState OF
     END_IF;
 
     (* Если температура outside не превышает порог аспирации не будет иначе заморозим продукт *)
-    IF AI_fTOutside <= FLT10(g_iToutAsper) THEN
+    IF AI_fTOutside <= F_FLT10(g_iToutAsper) THEN
         g_xCmdHeat := FALSE;
         iState := STATE_RESET;
     END_IF;
@@ -205,25 +207,25 @@ CASE iState OF
         (* Подогрев выключен *)
         g_xCmdHeat := FALSE;
 
-        (* Холод остановлен *)
-        g_xCmdCoolerStop := TRUE;
-
-        (* Вентиляторы: все 10 включены *)
-        g_xCmdFanH1 := TRUE; g_xCmdFanH2 := TRUE;
-        g_xCmdFanH3 := TRUE; g_xCmdFanH4 := TRUE;
-        g_xCmdFanH5 := TRUE; g_xCmdFanH6 := TRUE;
-        g_xCmdFanR1 := TRUE; g_xCmdFanR2 := TRUE;
-        g_xCmdFanR3 := TRUE; g_xCmdFanR4 := TRUE;
-
-        (* Клапаны: приток/сброс открыть, рециркуляцию закрыть *)
-        g_xCmdValveIn1 := TRUE; g_xCmdValveIn2 := TRUE;
-        g_xCmdValveOut1 := TRUE; g_xCmdValveOut2 := TRUE;
-        g_xCmdValveRec1 := FALSE; g_xCmdValveRec2 := FALSE;
-
         iState := STATE_ASPER; (* Аспирация *)
     END_IF;
 
 300: (* АСПИРАЦИЯ: все 10 вент., приток/сброс открыты, рециркуляция закрыта *)
+(* Холод остановлен *)
+    g_xCmdCoolerStop := TRUE;
+
+    (* Вентиляторы: все 10 включены *)
+    g_xCmdFanH1 := TRUE; g_xCmdFanH2 := TRUE;
+    g_xCmdFanH3 := TRUE; g_xCmdFanH4 := TRUE;
+    g_xCmdFanH5 := TRUE; g_xCmdFanH6 := TRUE;
+    g_xCmdFanR1 := TRUE; g_xCmdFanR2 := TRUE;
+    g_xCmdFanR3 := TRUE; g_xCmdFanR4 := TRUE;
+
+    (* Клапаны: приток/сброс открыть, рециркуляцию закрыть *)
+    g_xCmdValveIn1 := TRUE; g_xCmdValveIn2 := TRUE;
+    g_xCmdValveOut1 := TRUE; g_xCmdValveOut2 := TRUE;
+    g_xCmdValveRec1 := FALSE; g_xCmdValveRec2 := FALSE;
+
     (* Выход из Авто → сброс *)
     IF g_iModeCoarse <> 1 THEN
         iState := STATE_RESET;
@@ -251,8 +253,8 @@ g_iStep := iState;
 
    Длительности фаз:
    - рециркуляция: astIntens[g_iIntensity].RECIRC (мин);
-   - прогрев:      g_iPreheatTime, мин (счётчик g_iPreheatLeft);
-   - аспирация:    astIntens[g_iIntensity].ASPER (мин, регулярная) либо
+   - прогрев: g_iPreheatTime, мин (счётчик g_iPreheatLeft);
+   - аспирация: astIntens[g_iIntensity].ASPER (мин, регулярная) либо
                    g_iManualAspMin (ручная) — уже в локальном iAspTarget.
 
    Счётчики g_iRecircLeft / g_iPreheatLeft / g_iAspLeft считают ВВЕРХ
@@ -318,7 +320,17 @@ END_CASE;
    FanH2 — 4 с, ... FanR4 — 20 с. Так каскад работает одинаково и в
    Авто (все команды приходят разом), и в ручном режиме (вентиляторы
    включают по одному — каждый ждёт свою ступень, а не включается
-   мгновенно). Выключение — сразу у всех; TOF держит выход ещё 3 с. *)
+   мгновенно). Выключение — сразу у всех; TOF держит выход ещё 3 с.
+
+   РУЧНОЙ РЕЖИМ (Выключено, g_xModeManual = TRUE, iState = 2 = STATE_IDLE):
+   каскад TON гасится (AND NOT g_xModeManual), а выход вентилятора берётся
+   напрямую из команды g_xCmdFan* (M500–M509) БЕЗ TOF — мгновенное
+   включение и выключение (см. SEL ниже).
+   Условие (iState = STATE_IDLE) в ручной ветке защищает от гонки:
+   в скане перехода Продувка/Авто -> Выключено iState уже 0
+   (STATE_RESET), а не 2, поэтому ещё не сброшенные команды автомата
+   (g_xCmdFan* = TRUE) НЕ проходят в ручную ветку и не включают
+   вентиляторы все разом. *)
 g_xModeManual := NOT DI_ModeAuto AND NOT DI_ModePurge; (* для HMI: ручной режим вентиляторов *)
 
 fbTON1(IN := g_xCmdFanH1 AND NOT g_xModeManual, PT := T#2s);
@@ -333,16 +345,33 @@ fbTON9(IN := g_xCmdFanR3 AND NOT g_xModeManual, PT := T#18s);
 fbTON10(IN := g_xCmdFanR4 AND NOT g_xModeManual, PT := T#20s);
 
 
-fbTOF1(IN := fbTON1.Q OR (g_xCmdFanH1 AND g_xModeManual), PT := T#3s, Q := DO_FanH1);
-fbTOF2(IN := fbTON2.Q OR (g_xCmdFanH2 AND g_xModeManual), PT := T#3s, Q := DO_FanH2);
-fbTOF3(IN := fbTON3.Q OR (g_xCmdFanH3 AND g_xModeManual), PT := T#3s, Q := DO_FanH3);
-fbTOF4(IN := fbTON4.Q OR (g_xCmdFanH4 AND g_xModeManual), PT := T#3s, Q := DO_FanH4);
-fbTOF5(IN := fbTON5.Q OR (g_xCmdFanH5 AND g_xModeManual), PT := T#3s, Q := DO_FanH5);
-fbTOF6(IN := fbTON6.Q OR (g_xCmdFanH6 AND g_xModeManual), PT := T#3s, Q := DO_FanH6);
-fbTOF7(IN := fbTON7.Q OR (g_xCmdFanR1 AND g_xModeManual), PT := T#3s, Q := DO_FanR1);
-fbTOF8(IN := fbTON8.Q OR (g_xCmdFanR2 AND g_xModeManual), PT := T#3s, Q := DO_FanR2);
-fbTOF9(IN := fbTON9.Q OR (g_xCmdFanR3 AND g_xModeManual), PT := T#3s, Q := DO_FanR3);
-fbTOF10(IN := fbTON10.Q OR (g_xCmdFanR4 AND g_xModeManual), PT := T#3s, Q := DO_FanR4);
+fbTOF1(IN := fbTON1.Q, PT := T#3s);
+fbTOF2(IN := fbTON2.Q, PT := T#3s);
+fbTOF3(IN := fbTON3.Q, PT := T#3s);
+fbTOF4(IN := fbTON4.Q, PT := T#3s);
+fbTOF5(IN := fbTON5.Q, PT := T#3s);
+fbTOF6(IN := fbTON6.Q, PT := T#3s);
+fbTOF7(IN := fbTON7.Q, PT := T#3s);
+fbTOF8(IN := fbTON8.Q, PT := T#3s);
+fbTOF9(IN := fbTON9.Q, PT := T#3s);
+fbTOF10(IN := fbTON10.Q, PT := T#3s);
+
+(* Выходы вентиляторов:
+   - Авто/Продувка (g_xModeManual = FALSE): каскад TON + TOF 3 с;
+   - Выключено, устойчивое (g_xModeManual = TRUE И iState = STATE_IDLE):
+     ручная команда напрямую, БЕЗ TOF(мгновенное вкл/выкл);
+   - переходный скан (g_xModeManual = TRUE, iState = 0): fbTOF*.Q —
+     додержать каскадные, не включать новые (защита от гонки). *)
+DO_FanH1 := SEL(g_xModeManual AND (iState = STATE_IDLE), fbTOF1.Q, g_xCmdFanH1);
+DO_FanH2 := SEL(g_xModeManual AND (iState = STATE_IDLE), fbTOF2.Q, g_xCmdFanH2);
+DO_FanH3 := SEL(g_xModeManual AND (iState = STATE_IDLE), fbTOF3.Q, g_xCmdFanH3);
+DO_FanH4 := SEL(g_xModeManual AND (iState = STATE_IDLE), fbTOF4.Q, g_xCmdFanH4);
+DO_FanH5 := SEL(g_xModeManual AND (iState = STATE_IDLE), fbTOF5.Q, g_xCmdFanH5);
+DO_FanH6 := SEL(g_xModeManual AND (iState = STATE_IDLE), fbTOF6.Q, g_xCmdFanH6);
+DO_FanR1 := SEL(g_xModeManual AND (iState = STATE_IDLE), fbTOF7.Q, g_xCmdFanR1);
+DO_FanR2 := SEL(g_xModeManual AND (iState = STATE_IDLE), fbTOF8.Q, g_xCmdFanR2);
+DO_FanR3 := SEL(g_xModeManual AND (iState = STATE_IDLE), fbTOF9.Q, g_xCmdFanR3);
+DO_FanR4 := SEL(g_xModeManual AND (iState = STATE_IDLE), fbTOF10.Q, g_xCmdFanR4);
 
 DO_FanH1 := DO_FanH1 AND NOT g_xAnyBlock;
 DO_FanH2 := DO_FanH2 AND NOT g_xAnyBlock;
@@ -352,12 +381,19 @@ DO_FanH5 := DO_FanH5 AND NOT g_xAnyBlock;
 DO_FanH6 := DO_FanH6 AND NOT g_xAnyBlock;
 
 (* ── Клапаны (Belimo: питание = открыть, пружина = закрыть) ───── *)
-fbTOF11(IN := g_xCmdValveIn1, PT := T#3s, Q := DO_VlvIn1Open);
-fbTOF12(IN := g_xCmdValveIn2, PT := T#3s, Q := DO_VlvIn2Open);
-fbTOF13(IN := g_xCmdValveOut1, PT := T#3s, Q := DO_VlvOut1Open);
-fbTOF14(IN := g_xCmdValveOut2, PT := T#3s, Q := DO_VlvOut2Open);
-fbTOF15(IN := g_xCmdValveRec1, PT := T#3s, Q := DO_VlvRec1Open);
-fbTOF16(IN := g_xCmdValveRec2, PT := T#3s, Q := DO_VlvRec2Open);
+fbTOF11(IN := g_xCmdValveIn1, PT := T#3s);
+fbTOF12(IN := g_xCmdValveIn2, PT := T#3s);
+fbTOF13(IN := g_xCmdValveOut1, PT := T#3s);
+fbTOF14(IN := g_xCmdValveOut2, PT := T#3s);
+fbTOF15(IN := g_xCmdValveRec1, PT := T#3s);
+fbTOF16(IN := g_xCmdValveRec2, PT := T#3s);
+
+DO_VlvIn1Open := SEL(g_xModeManual AND (iState = STATE_IDLE), fbTOF11.Q, g_xValveIn);
+DO_VlvIn2Open := SEL(g_xModeManual AND (iState = STATE_IDLE), fbTOF12.Q, g_xValveIn);
+DO_VlvOut1Open := SEL(g_xModeManual AND (iState = STATE_IDLE), fbTOF13.Q, g_xValveOut);
+DO_VlvOut2Open := SEL(g_xModeManual AND (iState = STATE_IDLE), fbTOF14.Q, g_xValveOut);
+DO_VlvRec1Open := SEL(g_xModeManual AND (iState = STATE_IDLE), fbTOF15.Q, g_xValveRecycle);
+DO_VlvRec2Open := SEL(g_xModeManual AND (iState = STATE_IDLE), fbTOF16.Q, g_xValveRecycle);
 
 (* ── Подогрев заслонок приток/сброс ──────────────────────────── *)
 DO_HeatVlv := g_xCmdHeat;

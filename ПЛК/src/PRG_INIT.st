@@ -34,7 +34,7 @@ D8058 := 2#0000_0000_0000_1100;
    значению. Для уставок по умолчанию 0 (TprodMax, Hmin, коррекции)
    запись не выполняется вообще — они остаются как есть. *)
 
-IF g_iIntensity = 0 THEN g_iIntensity := 1; END_IF;   (* 600 мин рециркуляции *)
+IF g_iIntensity = 0 THEN g_iIntensity := 0; END_IF;   (* 600 мин рециркуляции *)
 IF g_iToutAsper = 0 THEN g_iToutAsper := 30; END_IF;  (* 3.0 °C — мин. t улицы для аспирации *)
 IF g_iToutHeat = 0 THEN g_iToutHeat := 50; END_IF;   (* 5.0 °C — мин. t улицы для подогрева заслонок *)
 IF g_iPreheatTime = 0 THEN g_iPreheatTime := 3; END_IF;   (* 3 мин — предподогрев *)

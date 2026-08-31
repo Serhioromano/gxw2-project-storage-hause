@@ -80,7 +80,6 @@ EI(TRUE);
 g_xCoolerWorks := DI_CoolerRun;
 g_xIsAuto := DI_ModeAuto;
 g_xAspirNow := g_iModeDisp = 3;
-g_xIsManual := g_iModeCoarse = 0;
 
 (* Host AI0: температура улицы, датчик 0-10 В (−50…+50 °C → −500…+500 °C×10).
    Экземпляр fbScaleHost общий для 3 каналов — ErrWire и ValueOut читаем
