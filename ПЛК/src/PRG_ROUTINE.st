@@ -82,6 +82,7 @@ g_xIsAuto := DI_ModeAuto;
 g_xAspirNow := g_iModeDisp = 3;
 g_iCurWait := astIntens[g_iIntensity].RECIRC;
 g_iCurAsper := astIntens[g_iIntensity].ASPER;
+g_xRecycleFlow := (DO_VlvRec1Open OR DO_VlvRec2Open) AND (g_iModeDisp = 2 OR g_iModeDisp = 1);
 
 (* Host AI0: температура улицы, датчик 0-10 В (−50…+50 °C → −500…+500 °C×10).
    Экземпляр fbScaleHost общий для 3 каналов — ErrWire и ValueOut читаем
