@@ -94,7 +94,8 @@ fbAMSet(iNum := 23, xState := fbScaleHost.xErrWire); (* обрыв 0-10 В *)
 AI_fTOutside := F_FLT10(fbScaleHost.iValueOut);
 
 (* Host AI2: температура в камере (ПВТ110, 4-20 мА, −40…+80 °C) *)
-fbScaleHost(iAINum := 2, iSType := STYPE_4_20MA, iMin := -400, iMax := 800);
+fbScaleHost(iAINum := 2, iSType := STYPE_4_20MA, iMin := -400, iMax := 800, 
+  iCorrection := g_iTCorrection);
 fbAMSet(iNum := 24, xState := fbScaleHost.xErrWire); (* обрыв 4-20 мА, t камеры *)
 AI_fTChamber := F_FLT10(fbScaleHost.iValueOut);
 
